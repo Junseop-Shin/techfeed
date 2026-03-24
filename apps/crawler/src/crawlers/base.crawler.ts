@@ -72,6 +72,12 @@ export abstract class BaseCrawler {
     // 새 콘텐츠 Redis 랭킹에 최신성 점수로 등록
     const initialScore = Date.now() / 1000;
     await this.redis.zadd(TRENDING_KEY, 'NX', initialScore, String(saved._id));
+
+    // 새 콘텐츠 알림 발행
+    await this.redis.publish(
+      'new_content',
+      JSON.stringify({ contentId: String(saved._id), title: raw.title, tags }),
+    );
   }
 
   private async indexToEs(id: string, content: IContent): Promise<void> {
