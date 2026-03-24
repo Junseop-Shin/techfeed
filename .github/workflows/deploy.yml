@@ -45,12 +45,12 @@ jobs:
             -p ${{ secrets.DEPLOY_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "mkdir -p C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed"
+            "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force -Path 'C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed' | Out-Null\""
           scp -i ~/.ssh/id_deploy \
             -P ${{ secrets.DEPLOY_PORT }} \
             -o StrictHostKeyChecking=no \
             /tmp/techfeed.env \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:"C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed/.env"
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed/.env"
 
       - name: Sync source files
         run: |
