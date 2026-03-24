@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
+import { trackEvent } from '../../src/api/contents';
 
 export default function ContentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: content, isLoading, isError } = useContentById(id ?? '');
+  const enteredAtRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (!id) return;
+
+    enteredAtRef.current = Date.now();
+    trackEvent([{ event_type: 'click', content_id: id }]);
+
+    return () => {
+      const duration_ms = Date.now() - enteredAtRef.current;
+      trackEvent([{ event_type: 'read', content_id: id, duration_ms }]);
+    };
+  }, [id]);
 
   const handleOpenExternal = () => {
     if (content?.url) {

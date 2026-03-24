@@ -1,5 +1,13 @@
 import { apiClient } from './client';
 
+export interface EventPayload {
+  event_type: 'read' | 'click' | 'bookmark' | 'share';
+  content_id: string;
+  tag?: string;
+  duration_ms?: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface Content {
   id: string;
   title: string;
@@ -43,3 +51,9 @@ export const getContentById = (id: string): Promise<Content> =>
 
 export const autocomplete = (q: string): Promise<string[]> =>
   apiClient.get('/contents/autocomplete', { params: { q } }).then((r) => r.data);
+
+export const trackEvent = (events: EventPayload[]): void => {
+  apiClient.post('/events', events).catch(() => {
+    // Silently fail — event tracking must not disrupt user experience
+  });
+};
