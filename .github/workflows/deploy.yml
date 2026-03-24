@@ -22,12 +22,12 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
 
       - name: Write .env file on server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          ssh -i ~/.ssh/id_deploy \
-            -p ${{ secrets.DEPLOY_PORT }} \
-            -o StrictHostKeyChecking=no \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "mkdir -p C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed && cat > C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed/.env << 'EOF'
+          cat > /tmp/techfeed.env << 'EOF'
           NODE_ENV=production
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           ELASTICSEARCH_URL=${{ secrets.ELASTICSEARCH_URL }}
@@ -40,16 +40,32 @@ jobs:
           FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
-          EOF"
+          EOF
+          ssh -i ~/.ssh/id_deploy \
+            -p ${{ secrets.DEPLOY_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "mkdir -p C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed"
+          scp -i ~/.ssh/id_deploy \
+            -P ${{ secrets.DEPLOY_PORT }} \
+            -o StrictHostKeyChecking=no \
+            /tmp/techfeed.env \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:"C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed/.env"
 
       - name: Sync source files
         run: |
-          tar czf - --exclude='.git' --exclude='apps/api/node_modules' --exclude='apps/crawler/node_modules' --exclude='apps/mobile/node_modules' --exclude='apps/api/dist' . \
-            | ssh -i ~/.ssh/id_deploy \
-                -p ${{ secrets.DEPLOY_PORT }} \
-                -o StrictHostKeyChecking=no \
-                ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-                "tar xzf - -C C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed"
+          tar czf - \
+            --exclude='.git' \
+            --exclude='apps/api/node_modules' \
+            --exclude='apps/crawler/node_modules' \
+            --exclude='apps/mobile/node_modules' \
+            --exclude='apps/api/dist' \
+            . \
+          | ssh -i ~/.ssh/id_deploy \
+              -p ${{ secrets.DEPLOY_PORT }} \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "tar xzf - -C C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed"
 
       - name: Deploy with Docker Compose
         run: |
