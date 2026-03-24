@@ -1,0 +1,51 @@
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+} from '@nestjs/common';
+import { ContentsService } from './contents.service';
+import { SearchContentsQueryDto } from './dto/search-contents.dto';
+
+@Controller('contents')
+export class ContentsController {
+  constructor(private readonly contentsService: ContentsService) {}
+
+  /**
+   * GET /contents?q=&tags=&source_type=&page=&limit=
+   * Full-text search via Elasticsearch with optional filters.
+   */
+  @Get()
+  async search(@Query() query: SearchContentsQueryDto) {
+    const tags = query.tags
+      ? query.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      : undefined;
+
+    return this.contentsService.search({
+      q: query.q,
+      tags,
+      source_type: query.source_type,
+      page: query.page,
+      limit: query.limit,
+    });
+  }
+
+  /**
+   * GET /contents/trending
+   * Returns top trending content IDs from Redis Sorted Set.
+   * Must be declared before /:id to avoid route conflict.
+   */
+  @Get('trending')
+  async trending() {
+    return this.contentsService.getTrending();
+  }
+
+  /**
+   * GET /contents/:id
+   * Fetches detail from MongoDB and increments view count in Redis.
+   */
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.contentsService.findById(id);
+  }
+}

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: techfeed-mongodb
+    ports:
+      - '3101:27017'
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: techfeed
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: techfeed-elasticsearch
+    ports:
+      - '3102:9200'
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: techfeed-redis
+    ports:
+      - '3103:6379'
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: techfeed-postgres
+    ports:
+      - '3104:5432'
+    environment:
+      POSTGRES_DB: techfeed
+      POSTGRES_USER: techfeed
+      POSTGRES_PASSWORD: techfeed_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  elasticsearch_data:
+  redis_data:
+  postgres_data:
