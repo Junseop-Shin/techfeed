@@ -310,6 +310,33 @@ BullMQ Job (15분 간격)
 
 ---
 
+## 배포
+
+### 서버 (Windows Server — DESKTOP-2AI7EKV)
+
+Docker Compose로 모든 백엔드 서비스 운영. 외부 노출은 Cloudflare Tunnel 경유.
+
+| 포트 | 서비스 | 외부 도메인 |
+|------|--------|-------------|
+| `3100` | NestJS API | `techfeed-api.nuclearbomb6518.com` |
+| `3101` | MongoDB | 내부 only |
+| `3102` | Elasticsearch | 내부 only |
+| `3103` | Redis | 내부 only |
+| `3104` | PostgreSQL/TimescaleDB | 내부 only |
+
+CI/CD: GitHub Actions → SSH → `docker compose up` (다른 프로젝트와 동일 방식)
+
+### 모바일 앱 (Expo EAS Build)
+
+모바일 앱은 서버가 아닌 유저 기기에서 실행. 앱스토어를 통해 배포.
+
+```
+Expo EAS Build → .ipa (iOS) → TestFlight → App Store
+              → .apk (Android) → Play Console → Google Play
+```
+
+---
+
 ## 리스크 & 대응
 
 | 리스크 | 대응 |
