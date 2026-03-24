@@ -74,3 +74,11 @@ jobs:
             -o StrictHostKeyChecking=no \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "cd C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed && docker compose up -d --build"
+
+      - name: Run database migrations
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+            -p ${{ secrets.DEPLOY_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR UNIQUE NOT NULL, password VARCHAR NOT NULL, fcm_token VARCHAR, created_at TIMESTAMPTZ DEFAULT now());\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS subscriptions (id SERIAL PRIMARY KEY, tag VARCHAR NOT NULL, user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, tag));\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, content_id VARCHAR NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, content_id));\""
