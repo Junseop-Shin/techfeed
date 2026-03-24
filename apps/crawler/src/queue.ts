@@ -1,6 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { config } from './config';
-import { createEsClient } from './db';
+import { createEsClient, createRedisClient } from './db';
 import { BlogCrawler } from './crawlers/blog.crawler';
 import { YouTubeCrawler } from './crawlers/youtube.crawler';
 import { JobCrawler } from './crawlers/job.crawler';
@@ -18,6 +18,7 @@ function parseRedisUrl(url: string): { host: string; port: number } {
 
 export async function startQueue(): Promise<void> {
   const esClient = createEsClient();
+  const redis = createRedisClient();
   const redisConnection = parseRedisUrl(config.redisUrl);
 
   const queue = new Queue(QUEUE_NAME, { connection: redisConnection });
@@ -27,9 +28,9 @@ export async function startQueue(): Promise<void> {
     async (job: Job) => {
       console.log(`[Queue] Running job: ${job.name}`);
 
-      const blog = new BlogCrawler(esClient);
-      const youtube = new YouTubeCrawler(esClient);
-      const jobs = new JobCrawler(esClient);
+      const blog = new BlogCrawler(esClient, redis);
+      const youtube = new YouTubeCrawler(esClient, redis);
+      const jobs = new JobCrawler(esClient, redis);
 
       await Promise.allSettled([blog.run(), youtube.run(), jobs.run()]);
 

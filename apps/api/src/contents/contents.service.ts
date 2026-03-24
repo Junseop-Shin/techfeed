@@ -14,10 +14,19 @@ export class ContentsService {
   ) {}
 
   async search(opts: SearchContentsOptions) {
-    return this.searchService.searchContents(opts);
+    const cacheKey = opts.source_type ?? 'main';
+    const cached = await this.cacheService.getFeedCache(cacheKey);
+    if (cached) return JSON.parse(cached);
+
+    const result = await this.searchService.searchContents(opts);
+    await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
+    return result;
   }
 
   async getTrending() {
+    const cached = await this.cacheService.getFeedCache('trending');
+    if (cached) return JSON.parse(cached);
+
     const ids = await this.cacheService.getTrending(20);
     if (ids.length === 0) return [];
 
@@ -26,9 +35,11 @@ export class ContentsService {
       .lean()
       .exec();
 
-    // Preserve ranking order from Redis ZSet
     const contentMap = new Map(contents.map((c) => [String(c._id), c]));
-    return ids.map((id) => contentMap.get(id)).filter(Boolean);
+    const result = ids.map((id) => contentMap.get(id)).filter(Boolean);
+
+    await this.cacheService.setFeedCache('trending', JSON.stringify(result));
+    return result;
   }
 
   async findById(id: string) {
@@ -40,5 +51,9 @@ export class ContentsService {
     await this.cacheService.incrementViewCount(id);
 
     return content;
+  }
+
+  async autocomplete(q: string) {
+    return this.searchService.autocomplete(q);
   }
 }

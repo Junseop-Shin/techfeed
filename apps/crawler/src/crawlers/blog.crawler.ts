@@ -1,13 +1,14 @@
 import Parser from 'rss-parser';
 import { Client } from '@elastic/elasticsearch';
+import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
 import { blogSources } from '../config';
 
 const parser = new Parser();
 
 export class BlogCrawler extends BaseCrawler {
-  constructor(esClient: Client) {
-    super(esClient);
+  constructor(esClient: Client, redis: Redis) {
+    super(esClient, redis);
   }
 
   async crawl(): Promise<RawContent[]> {

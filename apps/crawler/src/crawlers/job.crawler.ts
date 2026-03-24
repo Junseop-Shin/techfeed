@@ -1,12 +1,13 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { Client } from '@elastic/elasticsearch';
+import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
 import { jobSources } from '../config';
 
 export class JobCrawler extends BaseCrawler {
-  constructor(esClient: Client) {
-    super(esClient);
+  constructor(esClient: Client, redis: Redis) {
+    super(esClient, redis);
   }
 
   async crawl(): Promise<RawContent[]> {

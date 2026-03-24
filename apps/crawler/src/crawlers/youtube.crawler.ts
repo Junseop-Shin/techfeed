@@ -1,11 +1,12 @@
 import { youtube_v3, auth } from '@googleapis/youtube';
 import { Client } from '@elastic/elasticsearch';
+import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
 import { youtubeSources, config } from '../config';
 
 export class YouTubeCrawler extends BaseCrawler {
-  constructor(esClient: Client) {
-    super(esClient);
+  constructor(esClient: Client, redis: Redis) {
+    super(esClient, redis);
   }
 
   async crawl(): Promise<RawContent[]> {

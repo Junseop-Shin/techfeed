@@ -50,6 +50,25 @@ export class SearchService implements OnModuleInit {
     }
   }
 
+  async autocomplete(q: string): Promise<string[]> {
+    if (!q || q.length < 2) return [];
+
+    const result = await this.es.client.search({
+      index: INDEX_NAME,
+      size: 10,
+      query: {
+        multi_match: {
+          query: q,
+          fields: ['title'],
+          type: 'phrase_prefix',
+        },
+      },
+      _source: ['title'],
+    });
+
+    return result.hits.hits.map((h) => (h._source as { title: string }).title);
+  }
+
   async indexContent(id: string, doc: Record<string, unknown>) {
     await this.es.client.index({
       index: INDEX_NAME,

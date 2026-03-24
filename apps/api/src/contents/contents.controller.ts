@@ -3,6 +3,7 @@ import {
   Get,
   Param,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsQueryDto } from './dto/search-contents.dto';
@@ -38,6 +39,17 @@ export class ContentsController {
   @Get('trending')
   async trending() {
     return this.contentsService.getTrending();
+  }
+
+  /**
+   * GET /contents/autocomplete?q=
+   * Returns title suggestions from Elasticsearch (phrase_prefix).
+   * Must be declared before /:id to avoid route conflict.
+   */
+  @Get('autocomplete')
+  async autocomplete(@Query('q') q: string) {
+    if (!q) throw new BadRequestException('q is required');
+    return this.contentsService.autocomplete(q);
   }
 
   /**

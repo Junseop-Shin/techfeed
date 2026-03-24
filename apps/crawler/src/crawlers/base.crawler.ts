@@ -1,8 +1,10 @@
 import { Client } from '@elastic/elasticsearch';
+import Redis from 'ioredis';
 import { ContentModel, hashUrl, IContent } from '../models/content.model';
 import { keywordTagMap } from '../config';
 
 const ES_INDEX = 'contents';
+const TRENDING_KEY = 'rank:contents';
 
 export interface RawContent {
   type: 'blog' | 'youtube' | 'job';
@@ -16,7 +18,10 @@ export interface RawContent {
 }
 
 export abstract class BaseCrawler {
-  constructor(protected readonly esClient: Client) {}
+  constructor(
+    protected readonly esClient: Client,
+    protected readonly redis: Redis,
+  ) {}
 
   abstract crawl(): Promise<RawContent[]>;
 
@@ -62,8 +67,11 @@ export abstract class BaseCrawler {
     console.log(`[${this.constructor.name}] Saved: ${raw.title}`);
 
     await this.indexToEs(String(saved._id), saved.toObject() as IContent);
-
     await ContentModel.findByIdAndUpdate(saved._id, { es_indexed: true });
+
+    // 새 콘텐츠 Redis 랭킹에 최신성 점수로 등록
+    const initialScore = Date.now() / 1000;
+    await this.redis.zadd(TRENDING_KEY, 'NX', initialScore, String(saved._id));
   }
 
   private async indexToEs(id: string, content: IContent): Promise<void> {
