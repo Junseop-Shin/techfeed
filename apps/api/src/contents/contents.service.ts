@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -14,7 +15,7 @@ export class ContentsService {
   ) {}
 
   async search(opts: SearchContentsOptions) {
-    const cacheKey = opts.source_type ?? 'main';
+    const cacheKey = 'search:' + crypto.createHash('md5').update(JSON.stringify(opts)).digest('hex');
     const cached = await this.cacheService.getFeedCache(cacheKey);
     if (cached) return JSON.parse(cached);
 
@@ -24,7 +25,7 @@ export class ContentsService {
   }
 
   async getTrending() {
-    const cached = await this.cacheService.getFeedCache('trending');
+    const cached = await this.cacheService.getFeedCache('content:trending');
     if (cached) return JSON.parse(cached);
 
     const ids = await this.cacheService.getTrending(20);
@@ -38,7 +39,7 @@ export class ContentsService {
     const contentMap = new Map(contents.map((c) => [String(c._id), c]));
     const result = ids.map((id) => contentMap.get(id)).filter(Boolean);
 
-    await this.cacheService.setFeedCache('trending', JSON.stringify(result));
+    await this.cacheService.setFeedCache('content:trending', JSON.stringify(result));
     return result;
   }
 

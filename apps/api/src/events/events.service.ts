@@ -14,26 +14,31 @@ export class EventsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     try {
-      await this.dataSource.query(`
-        CREATE TABLE IF NOT EXISTS user_events (
-          time        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          user_id     UUID,
-          event_type  VARCHAR(50),
-          content_id  VARCHAR(100),
-          tag         VARCHAR(50),
-          duration_ms INTEGER,
-          metadata    JSONB
-        )
-      `);
-
-      await this.dataSource.query(`
-        SELECT create_hypertable('user_events', 'time', if_not_exists => TRUE)
-      `);
-
-      this.logger.log('user_events hypertable initialized');
-    } catch (error) {
-      this.logger.error('Failed to initialize user_events hypertable', error);
+      await this.initHypertable();
+    } catch (err) {
+      this.logger.error('Failed to initialize TimescaleDB hypertable', err);
+      // App continues — hypertable may not be available
     }
+  }
+
+  private async initHypertable(): Promise<void> {
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS user_events (
+        time        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        user_id     UUID,
+        event_type  VARCHAR(50),
+        content_id  VARCHAR(100),
+        tag         VARCHAR(50),
+        duration_ms INTEGER,
+        metadata    JSONB
+      )
+    `);
+
+    await this.dataSource.query(`
+      SELECT create_hypertable('user_events', 'time', if_not_exists => TRUE)
+    `);
+
+    this.logger.log('user_events hypertable initialized');
   }
 
   async saveEvents(events: CreateEventDto[], userId?: string): Promise<void> {

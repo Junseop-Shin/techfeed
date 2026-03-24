@@ -32,6 +32,7 @@ export class PushController {
   }
 
   @Post('test')
+  @UseGuards(JwtAuthGuard)
   async test(@Body() dto: TestPushDto) {
     await this.pushService.send(
       dto.fcm_token,

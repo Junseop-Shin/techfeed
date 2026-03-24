@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { RedisProvider } from '../cache/redis.provider';
 import { UsersService } from '../users/users.service';
 import { PushService } from '../push/push.service';
 
@@ -16,15 +16,14 @@ export class NotificationsService implements OnModuleInit {
   private subscriber: Redis;
 
   constructor(
-    private readonly config: ConfigService,
+    private readonly redisProvider: RedisProvider,
     private readonly usersService: UsersService,
     private readonly pushService: PushService,
   ) {}
 
   onModuleInit() {
-    const redisUrl = this.config.get<string>('REDIS_URL', 'redis://localhost:3103');
-    // subscriber requires a dedicated connection (cannot run commands in subscribe mode)
-    this.subscriber = new Redis(redisUrl);
+    // Pub/Sub subscriber requires a dedicated connection — duplicate() preserves config
+    this.subscriber = this.redisProvider.client.duplicate();
 
     this.subscriber.subscribe('new_content', (err) => {
       if (err) {

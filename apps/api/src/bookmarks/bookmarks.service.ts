@@ -18,16 +18,14 @@ export class BookmarksService {
   }
 
   async add(userId: string, contentId: string): Promise<void> {
-    const existing = await this.repo.findOne({
-      where: { user: { id: userId }, content_id: contentId },
-    });
-    if (existing) return;
-
-    const bookmark = this.repo.create({
-      user: { id: userId },
-      content_id: contentId,
-    });
-    await this.repo.save(bookmark);
+    try {
+      const bookmark = this.repo.create({ user: { id: userId }, content_id: contentId });
+      await this.repo.save(bookmark);
+    } catch (e: any) {
+      // unique violation (23505) — already exists, treat as success
+      if (e?.code === '23505') return;
+      throw e;
+    }
   }
 
   async remove(userId: string, contentId: string): Promise<void> {

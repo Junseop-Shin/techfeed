@@ -30,7 +30,7 @@ import { MetricsMiddleware } from './metrics/metrics.middleware';
         type: 'postgres',
         url: config.get('DATABASE_URL'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: true,
+        synchronize: process.env.NODE_ENV !== 'production',
       }),
       inject: [ConfigService],
     }),

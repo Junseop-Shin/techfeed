@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Content, ContentSchema } from '../contents/content.schema';
 import { UsersModule } from '../users/users.module';
 import { PushModule } from '../push/push.module';
+import { AppCacheModule } from '../cache/cache.module';
 import { NotificationsService } from './notifications.service';
 import { NotificationsScheduler } from './notifications.scheduler';
 
@@ -11,6 +12,7 @@ import { NotificationsScheduler } from './notifications.scheduler';
     MongooseModule.forFeature([{ name: Content.name, schema: ContentSchema }]),
     UsersModule,
     PushModule,
+    AppCacheModule,
   ],
   providers: [NotificationsService, NotificationsScheduler],
 })
