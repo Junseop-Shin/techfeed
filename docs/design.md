@@ -23,13 +23,18 @@
 [NestJS API Server]
    ├── 검색           → Elasticsearch
    ├── 피드 캐시/랭킹  → Redis
-   ├── 이벤트 저장    → TimescaleDB
+   ├── 이벤트 저장    → PostgreSQL + TimescaleDB 확장
    └── 푸시 알림      → FCM
         │
-[Crawler + node-cron (15분 간격)]
+[Crawler + BullMQ (15분 간격)]
    ├── 1. 테크 블로그  → RSS 파싱 (rss-parser)
-   ├── 2. YouTube     → YouTube Data API v3 + Gemini 요약
+   ├── 2. YouTube     → YouTube Data API v3 + Gemini 요약 (lazy)
    └── 3. 채용공고    → cheerio HTML 스크래핑
+        │
+        ↓
+   MongoDB (원본 저장)
+   Elasticsearch (검색 인덱싱)
+   Redis (캐시/랭킹 업데이트 + Pub/Sub → FCM)
 ```
 
 ---
@@ -40,13 +45,14 @@
 |---------|------|------|
 | 모바일 | Expo (React Native) | iOS/Android 공통 앱 |
 | 백엔드 | NestJS (TypeScript) | REST API 서버 |
-| 전문 검색 | Elasticsearch | 아티클 전문 검색, 태그 필터링, 자동완성 |
-| 캐시/랭킹 | Redis | 피드 캐시, 인기 랭킹, Pub/Sub 알림 트리거 |
-| 시계열 분석 | TimescaleDB | 유저 이벤트(읽기/클릭/북마크) 시계열 저장 |
-| 관계형 DB | PostgreSQL | 유저, 구독 태그, 북마크, 푸시 로그 |
+| 원본 저장 | **MongoDB** | 크롤링 원본 데이터 저장 (비정형, Source of Truth) |
+| 전문 검색 | Elasticsearch | 콘텐츠 전문 검색, 태그 필터링, 자동완성 |
+| 캐시/랭킹 | Redis | 피드 캐시, 인기 랭킹 (Sorted Set), Pub/Sub 알림 트리거 |
+| 유저/이벤트 | PostgreSQL + TimescaleDB 확장 | 유저·북마크·구독(관계형) + 유저 이벤트(시계열) |
 | 푸시 알림 | FCM (firebase-admin) | iOS/Android 공통 푸시 |
-| 크롤러 | node-cron + rss-parser + cheerio | 콘텐츠 수집 스케줄링 |
-| 영상 요약 | YouTube Data API v3 + Gemini API | 영상 자막 추출 → 요약 생성 |
+| 크롤러 큐 | BullMQ (Redis 기반) | 크롤링 작업 큐 — 재시도/실패 처리, 레이트리밋 |
+| 크롤러 | rss-parser + cheerio + YouTube Data API v3 | 콘텐츠 수집 |
+| 영상 요약 | Gemini API | 자막 추출 → 요약 (트렌딩 임계값 도달 시 lazy 실행) |
 | 인프라 | Docker Compose | 로컬 개발 및 배포 일관성 |
 
 ---
@@ -69,6 +75,9 @@ RSS 없는 블로그는 `cheerio`로 HTML 직접 파싱.
 ### 2. YouTube 채널
 
 YouTube Data API v3로 신규 영상 감지 → `youtube-transcript`로 자막 추출 → Gemini API로 요약.
+
+- YouTube API 할당량 절약을 위해 하루 1-2회 크롤링
+- Gemini 요약은 **lazy 실행** — 트렌딩 임계값 도달 시 or 유저 요청 시에만
 
 ```ts
 const youtubeSources = [
@@ -114,7 +123,26 @@ Elasticsearch의 `keyword` 타입 필드로 저장 → 필터 쿼리로 빠른 �
 
 ## 데이터 모델
 
-### Elasticsearch — 콘텐츠 인덱스
+### MongoDB — 콘텐츠 원본 (Source of Truth)
+
+소스 타입마다 구조가 다른 비정형 데이터를 유연하게 저장.
+
+```ts
+// 블로그
+{ type: 'blog', title, url, content, author, tags, published_at, source_name }
+
+// YouTube
+{ type: 'youtube', title, url, thumbnail, summary, duration, channel_name, tags, published_at }
+
+// 채용공고
+{ type: 'job', title, url, company, stack, location, tags, published_at }
+```
+
+URL SHA256 해싱으로 중복 체크.
+
+### Elasticsearch — 검색 인덱스
+
+MongoDB 저장 후 크롤러에서 직접 인덱싱 (Logstash 없이 단순하게).
 
 ```json
 {
@@ -136,9 +164,18 @@ Elasticsearch의 `keyword` 타입 필드로 저장 → 필터 쿼리로 빠른 �
 
 `source_type`: `"blog"` | `"youtube"` | `"job"`
 
-### TimescaleDB — 유저 이벤트
+### PostgreSQL + TimescaleDB 확장
+
+같은 인스턴스에서 관계형 데이터 + 시계열 이벤트 함께 관리.
 
 ```sql
+-- 관계형 (일반 테이블)
+users         (id, email, fcm_token, created_at)
+subscriptions (user_id, tag)
+bookmarks     (user_id, content_id, created_at)
+push_logs     (id, user_id, content_id, sent_at, type)
+
+-- 시계열 (hypertable)
 CREATE TABLE user_events (
     time        TIMESTAMPTZ NOT NULL,
     user_id     UUID,
@@ -161,15 +198,6 @@ rank:tags              → Sorted Set (score=조회수)
 user:{id}:tags         → Set   (유저 구독 태그)
 ```
 
-### PostgreSQL — 관계형
-
-```sql
-users         (id, email, fcm_token, created_at)
-subscriptions (user_id, tag)
-bookmarks     (user_id, content_id, created_at)
-push_logs     (id, user_id, content_id, sent_at, type)
-```
-
 ---
 
 ## API 설계
@@ -180,6 +208,7 @@ push_logs     (id, user_id, content_id, sent_at, type)
 GET  /contents?q=&tags=&source_type=&page=   검색 + 필터 (ES)
 GET  /contents/trending                       인기 콘텐츠 (Redis ZSet)
 GET  /contents/:id                            상세 + 조회 이벤트 기록
+GET  /contents/:id/summary                    Gemini 요약 (lazy 생성)
 ```
 
 ### User
@@ -210,17 +239,19 @@ POST /push/subscribe         FCM 토큰 등록
 ## 크롤링 → 푸시 흐름
 
 ```
-node-cron (15분 간격)
+BullMQ Job (15분 간격)
   → RSS / YouTube API / cheerio 크롤링
   → URL 해싱으로 중복 체크
-  → Elasticsearch 인덱싱
+  → MongoDB 저장 (원본)
+  → Elasticsearch 인덱싱 (검색)
+  → Redis 랭킹 업데이트
   → Redis PUBLISH "new_content" {tags: [...]}
         ↓
   Subscriber: user:{id}:tags 와 매칭
         ↓
   FCM 푸시 발송
         ↓
-  PostgreSQL push_logs 기록 + TimescaleDB 이벤트 기록
+  PostgreSQL push_logs 기록 + user_events 기록
 ```
 
 ---
@@ -245,9 +276,10 @@ node-cron (15분 간격)
 
 ### Phase 1 — 백엔드 기반 + 크롤러 (M, ~3일)
 - [ ] NestJS 프로젝트 셋업
-- [ ] Docker Compose (ES + Redis + TimescaleDB + PostgreSQL)
-- [ ] Elasticsearch 콘텐츠 인덱스 생성
-- [ ] 크롤러 기본 구조 (블로그 RSS 1개, YouTube 1개, 채용 1개)
+- [ ] Docker Compose (MongoDB + ES + Redis + PostgreSQL/TimescaleDB)
+- [ ] BullMQ 크롤러 큐 기본 구조
+- [ ] 크롤러 구현 (블로그 RSS 1개, YouTube 1개, 채용 1개)
+- [ ] MongoDB 저장 + ES 인덱싱
 - [ ] Contents 검색/조회 API
 
 ### Phase 2 — 캐시 & 랭킹 (S, ~1일)
@@ -272,7 +304,7 @@ node-cron (15분 간격)
 - [ ] 푸시 수신 처리
 
 ### Phase 6 — 이벤트 분석 (M, ~2일)
-- [ ] TimescaleDB 이벤트 수집
+- [ ] TimescaleDB 유저 이벤트 수집
 - [ ] 트렌드 분석 쿼리
 - [ ] Grafana 대시보드 연동 (devops-monitor)
 
@@ -282,9 +314,11 @@ node-cron (15분 간격)
 
 | 리스크 | 대응 |
 |--------|------|
-| YouTube 자막 없는 영상 | 자막 없으면 제목만 저장, 요약 스킵 |
+| YouTube 자막 없는 영상 | 자막 없으면 요약 스킵, 제목만 저장 |
+| YouTube API 할당량 | 하루 1-2회 크롤링, 할당량 모니터링 |
+| Gemini 요약 비용 | lazy 실행 — 트렌딩 임계값 도달 시 or 유저 요청 시에만 |
 | 채용공고 사이트 구조 변경 | 파서 모듈화로 사이트별 독립 유지 |
 | ES 메모리 | JVM Heap 512m 제한 |
-| 크롤링 중복 | URL SHA256 해싱으로 인덱싱 전 중복 체크 |
+| 크롤링 중복 | URL SHA256 해싱으로 저장 전 중복 체크 |
 | FCM 토큰 만료 | 로그인 시 토큰 갱신, 만료 토큰 자동 정리 |
 | ES 인덱스 무한 증가 | ILM — 90일 이상 콘텐츠 cold 티어 이동 |
