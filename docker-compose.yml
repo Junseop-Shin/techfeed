@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7
@@ -45,6 +43,35 @@ services:
       POSTGRES_PASSWORD: techfeed_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: techfeed-api
+    ports:
+      - '3100:3100'
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - elasticsearch
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  crawler:
+    build:
+      context: ./apps/crawler
+      dockerfile: Dockerfile
+    container_name: techfeed-crawler
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+      - elasticsearch
+      - redis
     restart: unless-stopped
 
 volumes:

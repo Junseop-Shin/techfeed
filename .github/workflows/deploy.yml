@@ -1,0 +1,60 @@
+name: Deploy to Home Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | base64 -d > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Write .env file on server
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+            -p ${{ secrets.DEPLOY_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "mkdir -p C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed && cat > C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed/.env << 'EOF'
+          NODE_ENV=production
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          ELASTICSEARCH_URL=${{ secrets.ELASTICSEARCH_URL }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+          YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+          EOF"
+
+      - name: Sync source files
+        run: |
+          tar czf - --exclude='.git' --exclude='apps/api/node_modules' --exclude='apps/crawler/node_modules' --exclude='apps/mobile/node_modules' --exclude='apps/api/dist' . \
+            | ssh -i ~/.ssh/id_deploy \
+                -p ${{ secrets.DEPLOY_PORT }} \
+                -o StrictHostKeyChecking=no \
+                ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+                "tar xzf - -C C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed"
+
+      - name: Deploy with Docker Compose
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+            -p ${{ secrets.DEPLOY_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed && docker compose up -d --build"
