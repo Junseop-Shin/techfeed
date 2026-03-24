@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
     container_name: techfeed-elasticsearch
     ports:
       - '3102:9200'
@@ -44,6 +44,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U techfeed']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build:
@@ -55,10 +60,14 @@ services:
     env_file:
       - .env
     depends_on:
-      - mongodb
-      - elasticsearch
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   crawler:
