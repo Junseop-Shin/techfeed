@@ -13,24 +13,37 @@ function formatDate(dateStr: string): string {
 }
 
 function BlogCard({ content }: { content: Content }) {
+  const hasThumbnail = !!content.thumbnail_url;
+
   return (
-    <View style={styles.cardInner}>
-      <Text style={styles.sourceName}>{content.source_name}</Text>
-      <Text style={styles.title} numberOfLines={2}>{content.title}</Text>
-      <View style={styles.meta}>
-        {content.author && (
-          <Text style={styles.metaText}>{content.author} · </Text>
-        )}
-        <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
-      </View>
-      {content.tags.length > 0 && (
-        <View style={styles.tagRow}>
-          {content.tags.slice(0, 3).map((tag) => (
-            <View key={tag} style={styles.tagBadge}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
+    <View style={[styles.cardInner, hasThumbnail && styles.cardInnerRow]}>
+      <View style={hasThumbnail ? styles.blogTextBlock : undefined}>
+        <Text style={styles.sourceName}>{content.source_name}</Text>
+        <Text style={styles.title} numberOfLines={hasThumbnail ? 3 : 2}>
+          {content.title}
+        </Text>
+        <View style={styles.meta}>
+          {content.author && (
+            <Text style={styles.metaText}>{content.author} · </Text>
+          )}
+          <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
         </View>
+        {content.tags.length > 0 && (
+          <View style={styles.tagRow}>
+            {content.tags.slice(0, 3).map((tag) => (
+              <View key={tag} style={styles.tagBadge}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+      {hasThumbnail && (
+        <Image
+          source={{ uri: content.thumbnail_url }}
+          style={styles.blogThumbnail}
+          accessibilityLabel={`Thumbnail for ${content.title}`}
+        />
       )}
     </View>
   );
@@ -107,6 +120,21 @@ const styles = StyleSheet.create({
   },
   cardInner: {
     padding: 16,
+  },
+  cardInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  blogTextBlock: {
+    flex: 1,
+  },
+  blogThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    flexShrink: 0,
   },
   thumbnail: {
     width: '100%',
