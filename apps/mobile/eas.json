@@ -3,27 +3,20 @@
     "version": ">= 18.0.0"
   },
   "build": {
+    "apk": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "googleServicesFile": "$GOOGLE_SERVICES_JSON"
-      },
-      "ios": {
-        "googleServicesFile": "$GOOGLE_SERVICES_PLIST"
-      }
+      "distribution": "internal"
     },
-    "production": {
-      "android": {
-        "googleServicesFile": "$GOOGLE_SERVICES_JSON"
-      },
-      "ios": {
-        "googleServicesFile": "$GOOGLE_SERVICES_PLIST"
-      }
-    }
+    "production": {}
   },
   "submit": {
     "production": {}
