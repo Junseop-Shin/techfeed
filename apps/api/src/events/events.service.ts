@@ -41,8 +41,32 @@ export class EventsService implements OnModuleInit {
     this.logger.log('user_events hypertable initialized');
   }
 
+  private forwardToMonitor(events: CreateEventDto[], userId?: string): void {
+    const url = process.env.MONITOR_INGESTOR_URL;
+    if (!url) return;
+
+    const payload = events.map((e) => ({
+      event_type: e.event_type,
+      service_id: 'techfeed',
+      user_id: userId ?? null,
+      metadata: {
+        content_id: e.content_id,
+        tag: e.tag,
+        duration_ms: e.duration_ms,
+      },
+    }));
+
+    fetch(`${url}/v1/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  }
+
   async saveEvents(events: CreateEventDto[], userId?: string): Promise<void> {
     if (events.length === 0) return;
+
+    this.forwardToMonitor(events, userId);
 
     const values = events
       .map((_, i) => {
