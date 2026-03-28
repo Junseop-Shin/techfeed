@@ -22,10 +22,10 @@ export class Bookmark {
   @Column()
   content_id: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   content_type: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   status: string | null;
 
   @CreateDateColumn()
