@@ -67,3 +67,7 @@ export const getUserPreferences = (): Promise<UserPreferences> =>
 
 export const updateUserPreferences = (prefs: Partial<UserPreferences>): Promise<void> =>
   apiClient.patch('/users/me/preferences', prefs).then((r) => r.data);
+
+export const getAvailableTags = (): Promise<string[]> =>
+  apiClient.get('/tags').then((r) => r.data.tags);
+
