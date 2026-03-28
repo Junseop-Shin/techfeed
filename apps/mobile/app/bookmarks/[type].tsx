@@ -1,0 +1,398 @@
+import React, { useCallback, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Alert,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ContentCard } from '../../src/components/ContentCard';
+import { useAuthStore } from '../../src/store/auth.store';
+import { useBookmarksByType, useUpdateBookmarkStatus } from '../../src/hooks/useBookmark';
+import type { BookmarkItem } from '../../src/api/users';
+
+type ContentTypeParam = 'blog' | 'youtube' | 'jobs';
+
+const CONTENT_TYPE_MAP: Record<ContentTypeParam, string> = {
+  blog: 'blog',
+  youtube: 'youtube',
+  jobs: 'job',
+};
+
+const HEADER_TITLE_MAP: Record<ContentTypeParam, string> = {
+  blog: '블로그 북마크',
+  youtube: 'YouTube 북마크',
+  jobs: '채용공고 북마크',
+};
+
+interface StatusTab {
+  value: string;
+  label: string;
+}
+
+const CONTENT_STATUS_TABS: StatusTab[] = [
+  { value: 'to_read', label: '읽어볼것' },
+  { value: 'reading', label: '읽는중' },
+  { value: 'read', label: '읽어봄' },
+  { value: 'shared', label: '공유함' },
+];
+
+const JOB_STATUS_TABS: StatusTab[] = [
+  { value: 'interested', label: '관심' },
+  { value: 'to_apply', label: '지원예정' },
+  { value: 'applied', label: '지원완료' },
+  { value: 'interviewing', label: '면접중' },
+  { value: 'accepted', label: '최종합격' },
+  { value: 'rejected', label: '탈락' },
+];
+
+function isValidType(type: string): type is ContentTypeParam {
+  return type === 'blog' || type === 'youtube' || type === 'jobs';
+}
+
+interface BookmarkItemRowProps {
+  item: BookmarkItem;
+  statusTabs: StatusTab[];
+  onStatusChange: (contentId: string, status: string) => void;
+}
+
+function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowProps) {
+  const handleLongPress = () => {
+    const options = statusTabs.map((tab) => ({
+      text: tab.label,
+      onPress: () => onStatusChange(item.content_id, tab.value),
+    }));
+    Alert.alert(
+      '상태 변경',
+      '북마크 상태를 선택하세요.',
+      [...options, { text: '취소', style: 'cancel' as const }]
+    );
+  };
+
+  const currentStatus = statusTabs.find((t) => t.value === item.status);
+
+  return (
+    <TouchableOpacity
+      style={styles.bookmarkRow}
+      onLongPress={handleLongPress}
+      accessibilityRole="button"
+      accessibilityLabel={`북마크 아이템, 길게 눌러 상태 변경`}
+      accessibilityHint="길게 누르면 상태를 변경할 수 있습니다"
+    >
+      {item.content ? (
+        <ContentCard content={item.content} />
+      ) : (
+        <View style={styles.fallbackRow}>
+          <Text style={styles.fallbackId} numberOfLines={1}>
+            {item.content_id}
+          </Text>
+        </View>
+      )}
+      {currentStatus && (
+        <View style={styles.statusBadgeWrapper}>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>{currentStatus.label}</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+export default function BookmarksTypeScreen() {
+  const { type } = useLocalSearchParams<{ type: string }>();
+  const token = useAuthStore((s) => s.token);
+
+  const validType = isValidType(type ?? '') ? (type as ContentTypeParam) : 'blog';
+  const contentType = CONTENT_TYPE_MAP[validType];
+  const statusTabs = validType === 'jobs' ? JOB_STATUS_TABS : CONTENT_STATUS_TABS;
+
+  const [selectedStatus, setSelectedStatus] = useState<string>(statusTabs[0].value);
+
+  const { data: bookmarks, isLoading, isError, refetch } = useBookmarksByType(contentType);
+  const { mutate: updateStatus } = useUpdateBookmarkStatus();
+
+  const filteredBookmarks = bookmarks?.filter((b) => b.status === selectedStatus) ?? [];
+
+  const handleStatusChange = useCallback(
+    (contentId: string, status: string) => {
+      updateStatus(
+        { contentId, status },
+        {
+          onError: () => {
+            Alert.alert('오류', '상태 변경에 실패했습니다.');
+          },
+        }
+      );
+    },
+    [updateStatus]
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: BookmarkItem }) => (
+      <BookmarkItemRow
+        item={item}
+        statusTabs={statusTabs}
+        onStatusChange={handleStatusChange}
+      />
+    ),
+    [statusTabs, handleStatusChange]
+  );
+
+  const keyExtractor = useCallback((item: BookmarkItem) => String(item.id), []);
+
+  if (!token) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로 가기"
+          >
+            <Text style={styles.backBtnText}>{'<'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{HEADER_TITLE_MAP[validType]}</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <View style={styles.center}>
+          <Text style={styles.message}>북마크를 보려면 로그인이 필요합니다.</Text>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/auth/login')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.loginButtonText}>로그인하기</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="뒤로 가기"
+        >
+          <Text style={styles.backBtnText}>{'<'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{HEADER_TITLE_MAP[validType]}</Text>
+        <View style={styles.backBtn} />
+      </View>
+
+      {/* Status tabs */}
+      <View style={styles.statusTabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statusTabsContent}
+        >
+          {statusTabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.value}
+              style={[
+                styles.statusTab,
+                selectedStatus === tab.value && styles.statusTabActive,
+              ]}
+              onPress={() => setSelectedStatus(tab.value)}
+              accessibilityRole="tab"
+              accessibilityLabel={tab.label}
+              accessibilityState={{ selected: selectedStatus === tab.value }}
+            >
+              <Text
+                style={[
+                  styles.statusTabText,
+                  selectedStatus === tab.value && styles.statusTabTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {isLoading && (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      )}
+      {isError && (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>북마크를 불러올 수 없습니다.</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => refetch()}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {!isLoading && !isError && (
+        <FlatList
+          data={filteredBookmarks}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>해당 상태의 북마크가 없습니다.</Text>
+            </View>
+          }
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  backBtn: {
+    width: 32,
+    alignItems: 'flex-start',
+  },
+  backBtnText: {
+    fontSize: 20,
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  statusTabsWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  statusTabsContent: {
+    paddingHorizontal: 16,
+  },
+  statusTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginRight: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  statusTabActive: {
+    borderBottomColor: '#2563EB',
+  },
+  statusTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  statusTabTextActive: {
+    color: '#2563EB',
+  },
+  bookmarkRow: {
+    position: 'relative',
+  },
+  statusBadgeWrapper: {
+    position: 'absolute',
+    top: 14,
+    right: 28,
+  },
+  statusBadge: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  fallbackRow: {
+    marginHorizontal: 16,
+    marginVertical: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  fallbackId: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  list: {
+    paddingVertical: 8,
+    paddingBottom: 24,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  message: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  loginButton: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: {
+    fontSize: 14,
+    color: '#2563EB',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#EF4444',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+});
+
+/*
+Usage:
+router.push('/bookmarks/blog')    → 블로그 북마크 (to_read | reading | read | shared)
+router.push('/bookmarks/youtube') → YouTube 북마크 (to_read | reading | read | shared)
+router.push('/bookmarks/jobs')    → 채용공고 북마크 (interested | to_apply | applied | interviewing | accepted | rejected)
+*/

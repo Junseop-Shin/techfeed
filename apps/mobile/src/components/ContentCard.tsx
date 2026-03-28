@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Content } from '../api/contents';
 import { getContentSummary } from '../api/contents';
 import { useBookmarks, useToggleBookmark } from '../hooks/useBookmark';
+import { addBookmarkWithType } from '../api/users';
 import { useAuthStore } from '../store/auth.store';
 
 interface ContentCardProps {
@@ -16,7 +17,7 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function BookmarkButton({ contentId }: { contentId: string }) {
+function BookmarkButton({ contentId, sourceType }: { contentId: string; sourceType: string }) {
   const token = useAuthStore((s) => s.token);
   const { data: bookmarkIds } = useBookmarks();
   const { mutate: toggleBookmark } = useToggleBookmark();
@@ -26,6 +27,12 @@ function BookmarkButton({ contentId }: { contentId: string }) {
   const isBookmarked = bookmarkIds?.has(contentId) ?? false;
 
   const handlePress = () => {
+    if (!isBookmarked && sourceType) {
+      // Add with content type so the backend can categorise the bookmark
+      addBookmarkWithType(contentId, sourceType).catch(() => {
+        // Fallback: optimistic update still proceeds via toggleBookmark
+      });
+    }
     toggleBookmark({ contentId, isBookmarked });
   };
 
@@ -52,11 +59,16 @@ function BlogCard({ content }: { content: Content }) {
       <View style={hasThumbnail ? styles.blogTextBlock : undefined}>
         <View style={styles.rowBetween}>
           <Text style={styles.sourceName}>{content.source_name}</Text>
-          <BookmarkButton contentId={content.id} />
+          <BookmarkButton contentId={content.id} sourceType={content.source_type} />
         </View>
         <Text style={styles.title} numberOfLines={hasThumbnail ? 3 : 2}>
           {content.title}
         </Text>
+        {content.summary && (
+          <Text style={styles.summary} numberOfLines={2}>
+            {content.summary}
+          </Text>
+        )}
         <View style={styles.meta}>
           {content.author && (
             <Text style={styles.metaText}>{content.author} · </Text>
@@ -100,7 +112,7 @@ function YoutubeCard({ content }: { content: Content }) {
         <Text style={styles.sourceName}>
           {content.channel_name ?? content.source_name}
         </Text>
-        <BookmarkButton contentId={content.id} />
+        <BookmarkButton contentId={content.id} sourceType={content.source_type} />
       </View>
       {content.thumbnail_url && (
         <Image
@@ -142,11 +154,16 @@ function JobCard({ content }: { content: Content }) {
     <View style={styles.cardInner}>
       <View style={styles.rowBetween}>
         <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
-        <BookmarkButton contentId={content.id} />
+        <BookmarkButton contentId={content.id} sourceType={content.source_type} />
       </View>
       <Text style={styles.title} numberOfLines={2}>
         {content.position ?? content.title}
       </Text>
+      {content.summary && (
+        <Text style={styles.jobLocation} numberOfLines={1}>
+          {content.summary}
+        </Text>
+      )}
       {content.tags.length > 0 && (
         <View style={styles.tagRow}>
           {content.tags.slice(0, 4).map((tag) => (
@@ -156,6 +173,7 @@ function JobCard({ content }: { content: Content }) {
           ))}
         </View>
       )}
+      <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
     </View>
   );
 }
@@ -242,6 +260,17 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  summary: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  jobLocation: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 6,
   },
   tagRow: {
     flexDirection: 'row',
