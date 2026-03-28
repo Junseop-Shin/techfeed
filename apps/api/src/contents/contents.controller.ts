@@ -4,9 +4,12 @@ import {
   Param,
   Query,
   BadRequestException,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ContentsService } from './contents.service';
 import { SearchContentsQueryDto } from './dto/search-contents.dto';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @Controller('contents')
 export class ContentsController {
@@ -39,6 +42,22 @@ export class ContentsController {
   @Get('trending')
   async trending() {
     return this.contentsService.getTrending();
+  }
+
+  /**
+   * GET /contents/recommended
+   * Returns personalized feed based on user subscriptions.
+   * Falls back to latest content for unauthenticated users.
+   */
+  @Get('recommended')
+  @UseGuards(OptionalJwtAuthGuard)
+  async recommended(
+    @Request() req: { user?: { userId: string } },
+    @Query('limit') limit?: string,
+  ) {
+    const userId = req.user?.userId ?? null;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    return this.contentsService.getRecommended(userId, parsedLimit);
   }
 
   /**

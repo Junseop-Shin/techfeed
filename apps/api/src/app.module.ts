@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { EventsModule } from './events/events.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MetricsMiddleware } from './metrics/metrics.middleware';
     NotificationsModule,
     EventsModule,
     MetricsModule,
+    CommentsModule,
   ],
 })
 export class AppModule implements NestModule {

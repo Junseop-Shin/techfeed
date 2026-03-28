@@ -4,13 +4,15 @@ import {
   Delete,
   Get,
   NotFoundException,
+  Patch,
   Put,
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 class UpdateTagsDto {
   @IsArray()
@@ -23,10 +25,25 @@ class UpdateFcmTokenDto {
   fcm_token: string;
 }
 
+class UpdatePreferencesDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  channels?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  subjects?: string[];
+}
+
 @Controller('users/me')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   @Get()
   async getMe(@Request() req: { user: { userId: string; email: string } }) {
@@ -40,6 +57,42 @@ export class UsersController {
       created_at: user.created_at,
       tags: user.subscriptions?.map((s) => s.tag) ?? [],
     };
+  }
+
+  @Get('stats')
+  async getStats(@Request() req: { user: { userId: string } }) {
+    return this.usersService.getStats(req.user.userId);
+  }
+
+  @Get('preferences')
+  async getPreferences(@Request() req: { user: { userId: string } }) {
+    const [channels, subjects] = await Promise.all([
+      this.subscriptionsService.getByType(req.user.userId, 'channel'),
+      this.subscriptionsService.getByType(req.user.userId, 'subject'),
+    ]);
+
+    return {
+      channels: channels.map((s) => s.tag),
+      subjects: subjects.map((s) => s.tag),
+    };
+  }
+
+  @Patch('preferences')
+  async updatePreferences(
+    @Request() req: { user: { userId: string } },
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    const ops: Promise<void>[] = [];
+
+    if (dto.channels !== undefined) {
+      ops.push(this.subscriptionsService.syncChannels(req.user.userId, dto.channels));
+    }
+    if (dto.subjects !== undefined) {
+      ops.push(this.subscriptionsService.syncSubjects(req.user.userId, dto.subjects));
+    }
+
+    await Promise.all(ops);
+    return { success: true };
   }
 
   @Put('tags')

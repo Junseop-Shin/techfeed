@@ -3,6 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Bookmark } from './bookmark.entity';
 
+interface JobBookmarkForAlert {
+  content_id: string;
+  userId: string;
+}
+
 const DEFAULT_STATUS: Record<string, string> = {
   blog: 'to_read',
   youtube: 'to_read',
@@ -56,5 +61,23 @@ export class BookmarksService {
 
   async remove(userId: string, contentId: string): Promise<void> {
     await this.repo.delete({ user: { id: userId }, content_id: contentId });
+  }
+
+  async findJobBookmarksForAlert(): Promise<JobBookmarkForAlert[]> {
+    // status가 NULL이거나 '탈락'/'최종합격'이 아닌 job 북마크 조회
+    const bookmarks = await this.repo
+      .createQueryBuilder('bookmark')
+      .leftJoinAndSelect('bookmark.user', 'user')
+      .where('bookmark.content_type = :type', { type: 'job' })
+      .andWhere(
+        '(bookmark.status IS NULL OR bookmark.status NOT IN (:...excluded))',
+        { excluded: ['탈락', '최종합격'] },
+      )
+      .getMany();
+
+    return bookmarks.map((b) => ({
+      content_id: b.content_id,
+      userId: b.user.id,
+    }));
   }
 }
