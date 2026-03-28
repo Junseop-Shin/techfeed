@@ -11,6 +11,7 @@ export interface RawContent {
   title: string;
   url: string;
   summary?: string;
+  content_body?: string;
   thumbnail?: string;
   tags: string[];
   source_name: string;

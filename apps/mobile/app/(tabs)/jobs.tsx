@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { ContentCard } from '../../src/components/ContentCard';
-import { useContents } from '../../src/hooks/useContents';
+import { getContents } from '../../src/api/contents';
 import { useThemeStore } from '../../src/store/theme.store';
 import type { Content } from '../../src/api/contents';
 
@@ -36,17 +37,47 @@ export default function JobsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [allItems, setAllItems] = useState<Content[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const combinedTags = useMemo(() => {
     const subjectTags = SUBJECT_FILTERS.find((s) => s.label === selectedSubject)?.tags ?? [];
     const all = [...subjectTags, ...selectedTags];
     return all.length > 0 ? all.join(',') : undefined;
   }, [selectedSubject, selectedTags]);
 
-  const { data, isLoading, isError, refetch } = useContents({
-    source_type: 'job',
-    q: submittedQuery || undefined,
-    tags: combinedTags,
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['contents', { source_type: 'job', q: submittedQuery, tags: combinedTags, page: 1 }],
+    queryFn: () => getContents({ source_type: 'job', q: submittedQuery || undefined, tags: combinedTags, page: 1, limit: 20 }),
   });
+
+  useEffect(() => {
+    setPage(1);
+    setAllItems([]);
+  }, [submittedQuery, combinedTags]);
+
+  useEffect(() => {
+    if (data?.items) {
+      setAllItems(data.items);
+      setHasMore(data.items.length < data.total);
+    }
+  }, [data]);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const result = await getContents({ source_type: 'job', q: submittedQuery || undefined, tags: combinedTags, page: nextPage, limit: 20 });
+      setAllItems(prev => [...prev, ...result.items]);
+      setHasMore(allItems.length + result.items.length < result.total);
+      setPage(nextPage);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, page, submittedQuery, combinedTags, allItems.length]);
 
   const handleChangeText = useCallback((text: string) => {
     setQuery(text);
@@ -68,6 +99,8 @@ export default function JobsScreen() {
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    setPage(1);
+    setAllItems([]);
     await refetch();
     setRefreshing(false);
   }, [refetch]);
@@ -163,6 +196,17 @@ export default function JobsScreen() {
     center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: 80 },
     errorText: { fontSize: 14, color: '#EF4444' },
     emptyText: { fontSize: 14, color: colors.textSecondary },
+    loadMoreBtn: {
+      marginHorizontal: 16,
+      marginVertical: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      alignItems: 'center' as const,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    loadMoreText: { fontSize: 14, fontWeight: '600' as const, color: colors.primary },
   }), [colors]);
 
   return (
@@ -258,7 +302,7 @@ export default function JobsScreen() {
       )}
       {!isLoading && !isError && (
         <FlatList
-          data={data?.items ?? []}
+          data={allItems}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
@@ -270,6 +314,23 @@ export default function JobsScreen() {
             <View style={styles.center}>
               <Text style={styles.emptyText}>채용공고가 없습니다.</Text>
             </View>
+          }
+          ListFooterComponent={
+            hasMore ? (
+              <TouchableOpacity
+                style={styles.loadMoreBtn}
+                onPress={loadMore}
+                disabled={isLoadingMore}
+                accessibilityRole="button"
+                accessibilityLabel="더보기"
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={styles.loadMoreText}>더보기</Text>
+                )}
+              </TouchableOpacity>
+            ) : null
           }
         />
       )}

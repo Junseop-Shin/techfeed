@@ -7,6 +7,7 @@ export interface IContent {
   url: string;
   url_hash: string;
   summary?: string;
+  content_body?: string;
   thumbnail?: string;
   tags: string[];
   source_name: string;
@@ -24,6 +25,7 @@ const ContentSchema = new Schema<ContentDocument>(
     url: { type: String, required: true, unique: true },
     url_hash: { type: String, required: true, unique: true, index: true },
     summary: { type: String },
+    content_body: { type: String },
     thumbnail: { type: String },
     tags: { type: [String], default: [] },
     source_name: { type: String, required: true },
