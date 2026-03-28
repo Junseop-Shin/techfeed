@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getBookmarks, addBookmark, removeBookmark } from '../api/users';
+import {
+  getBookmarks,
+  addBookmark,
+  removeBookmark,
+  getBookmarksByType,
+  updateBookmarkStatus,
+} from '../api/users';
 import { useAuthStore } from '../store/auth.store';
 
 export const useBookmarks = () => {
@@ -38,6 +44,27 @@ export const useToggleBookmark = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+    },
+  });
+};
+
+export const useBookmarksByType = (contentType: string) => {
+  const token = useAuthStore((s) => s.token);
+  return useQuery({
+    queryKey: ['bookmarks', 'byType', contentType],
+    queryFn: () => getBookmarksByType(contentType),
+    enabled: !!token,
+  });
+};
+
+export const useUpdateBookmarkStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ contentId, status }: { contentId: string; status: string }) =>
+      updateBookmarkStatus(contentId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookmarks', 'byType'] });
     },
   });
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { Tabs } from 'expo-router';
 
 export default function TabsLayout() {
@@ -15,32 +16,32 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="blog"
         options={{
-          title: '피드',
-          tabBarLabel: '피드',
+          title: '블로그',
+          tabBarLabel: '블로그',
           tabBarIcon: ({ color }) => (
-            <TabIcon name="home" color={color} />
+            <TabIcon name="blog" color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="youtube"
         options={{
-          title: '검색',
-          tabBarLabel: '검색',
+          title: 'YouTube',
+          tabBarLabel: 'YouTube',
           tabBarIcon: ({ color }) => (
-            <TabIcon name="search" color={color} />
+            <TabIcon name="youtube" color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="bookmarks"
+        name="jobs"
         options={{
-          title: '북마크',
-          tabBarLabel: '북마크',
+          title: '채용공고',
+          tabBarLabel: '채용공고',
           tabBarIcon: ({ color }) => (
-            <TabIcon name="bookmark" color={color} />
+            <TabIcon name="jobs" color={color} />
           ),
         }}
       />
@@ -54,19 +55,21 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* Hidden tabs — kept for redirect compatibility */}
+      <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="bookmarks" options={{ href: null }} />
     </Tabs>
   );
 }
 
-// Minimal icon component using text symbols (no icon library dependency)
 function TabIcon({ name, color }: { name: string; color: string }) {
   const icons: Record<string, string> = {
-    home: '⌂',
-    search: '⌕',
-    bookmark: '⊡',
+    blog: '✏',
+    youtube: '▶',
+    jobs: '💼',
     settings: '⚙',
   };
-  const { Text } = require('react-native');
   return (
     <Text style={{ fontSize: 20, color, lineHeight: 24 }}>
       {icons[name] ?? '●'}

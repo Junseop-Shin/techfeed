@@ -43,7 +43,7 @@ export class NotificationsScheduler {
       const body = `이번 주 트렌드: ${titles}`;
 
       const users = await this.usersService.findAllWithFcmToken();
-      const tokens = users.map((u) => u.fcm_token).filter(Boolean);
+      const tokens = users.map((u) => u.fcm_token).filter((t): t is string => t !== null);
 
       if (tokens.length === 0) {
         this.logger.log('No users with FCM tokens — skipping weekly push');

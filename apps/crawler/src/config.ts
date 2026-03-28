@@ -7,10 +7,6 @@ export const config = {
 };
 
 export const blogSources = [
-  // 해외
-  { name: 'dev.to', url: 'https://dev.to/feed', tags: ['webdev'] },
-  { name: 'Anthropic', url: 'https://www.anthropic.com/rss.xml', tags: ['ai', 'llm'] },
-
   // 국내 대기업 기술 블로그
   { name: '네이버 D2', url: 'https://d2.naver.com/d2.atom', tags: ['naver'] },
   { name: '카카오 Tech', url: 'https://tech.kakao.com/feed/', tags: ['kakao'] },
@@ -23,18 +19,21 @@ export const blogSources = [
   { name: '토스 Tech', url: 'https://toss.tech/rss.xml', tags: ['toss', 'fintech'] },
   { name: '쿠팡 Engineering', url: 'https://medium.com/feed/coupang-engineering', tags: ['coupang'] },
   { name: '컬리 Tech', url: 'https://helloworld.kurly.com/feed.xml', tags: ['kurly'] },
+  { name: '현대자동차 Tech', url: 'https://techblog.hyundai.com/rss', tags: ['hyundai'] },
+  { name: '라인플러스 Tech', url: 'https://techblog.lycorp.co.jp/ko/feed/rss', tags: ['line'] },
+  { name: '뱅크샐러드 Tech', url: 'https://blog.banksalad.com/rss.xml', tags: ['banksalad', 'fintech'] },
+  { name: '무신사 Tech', url: 'https://medium.com/feed/musinsa-tech', tags: ['musinsa'] },
 
-  // 커뮤니티
+  // 커뮤니티 / 미디어
   { name: '긱뉴스', url: 'https://news.hada.io/rss', tags: ['news'] },
+  { name: '요즘IT', url: 'https://yozm.wishket.com/magazine/feed/', tags: ['news'] },
 ];
 
 export const youtubeSources = [
-  // 해외
-  { name: 'Fireship', channelId: 'UCsBjURrPoezykLs9EqgamOA', tags: ['webdev'] },
-  { name: 'Theo', channelId: 'UCbRP3c757lWg9M-U7TyEkXA', tags: ['webdev', 'react'] },
-  { name: 'The Primeagen', channelId: 'UC8ENHE5xdFSwx71WHd4Ar7Q', tags: ['rust', 'backend'] },
-
   // 국내
+  { name: '코딩애플', channelId: 'UCSLrpBAzr-ROVGHQ5EmxnUg', tags: ['webdev', 'javascript'] },
+  { name: '노마드 코더', channelId: 'UCUpJs89fSBXNolQGOYKn0YQ', tags: ['webdev', 'react'] },
+  { name: '드림코딩', channelId: 'UC_4u-bXaba7yrRz_6x6kb_w', tags: ['webdev', 'javascript'] },
   { name: '우아한Tech', channelId: 'UCgWQRq64kNRMBzEjUERfixg', tags: ['baemin', 'backend'] },
   { name: 'NAVER D2', channelId: 'UCNfSsRMFqDYxHmGBmBqNPXQ', tags: ['naver'] },
 ];
@@ -58,6 +57,7 @@ export const keywordTagMap: Record<string, string[]> = {
   golang: ['golang', 'go lang'],
   java: ['java', 'spring', 'springboot'],
   kotlin: ['kotlin'],
+  swift: ['swift', 'ios', 'swiftui'],
   aws: ['aws', 'ec2', 's3', 'lambda'],
   msa: ['msa', 'microservice', '마이크로서비스'],
   ai: ['ai', 'llm', 'gpt', 'claude', 'gemini', '머신러닝', 'machine learning'],
