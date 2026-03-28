@@ -25,6 +25,9 @@ export class Content {
   ai_summary?: string;
 
   @Prop()
+  content_body?: string;
+
+  @Prop()
   thumbnail?: string;
 
   @Prop({ type: [String], default: [] })
