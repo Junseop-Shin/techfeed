@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { IsArray, IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { UsersService } from './users.service';
+import { UsersService, UserStats } from './users.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 class UpdateTagsDto {
@@ -60,7 +60,7 @@ export class UsersController {
   }
 
   @Get('stats')
-  async getStats(@Request() req: { user: { userId: string } }) {
+  async getStats(@Request() req: { user: { userId: string } }): Promise<UserStats> {
     return this.usersService.getStats(req.user.userId);
   }
 
