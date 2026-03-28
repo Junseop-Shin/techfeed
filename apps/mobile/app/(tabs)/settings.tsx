@@ -25,14 +25,8 @@ import {
   getUserStats,
   getUserPreferences,
   updateUserPreferences,
+  getAvailableTags,
 } from '../../src/api/users';
-
-const PREDEFINED_TAGS = [
-  'react', 'typescript', 'nextjs', 'javascript',
-  'python', 'java', 'kotlin', 'golang', 'rust', 'swift',
-  'aws', 'devops', 'kubernetes', 'docker',
-  'ai', 'database', 'msa',
-];
 
 async function getAndRegisterPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
@@ -64,6 +58,12 @@ export default function SettingsScreen() {
     queryKey: ['userPreferences'],
     queryFn: getUserPreferences,
     enabled: !!token,
+  });
+
+  const { data: availableTags = [] } = useQuery({
+    queryKey: ['availableTags'],
+    queryFn: getAvailableTags,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
   const [tags, setTags] = useState<string[]>([]);
@@ -524,7 +524,7 @@ export default function SettingsScreen() {
           ) : (
             <>
               <View style={styles.predefinedTagList}>
-                {PREDEFINED_TAGS.map((tag) => {
+                {availableTags.map((tag) => {
                   const active = tags.includes(tag);
                   return (
                     <TouchableOpacity

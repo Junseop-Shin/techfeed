@@ -60,4 +60,8 @@ export const keywordTagMap: Record<string, string[]> = {
   ai: ['ai', 'llm', 'gpt', 'claude', 'gemini', '머신러닝', 'machine learning'],
   database: ['database', 'mysql', 'postgresql', 'mongodb', 'redis'],
   devops: ['devops', 'ci/cd', 'terraform', 'ansible'],
+  frontend: ['프론트엔드', 'frontend', 'front-end'],
+  backend: ['백엔드', 'backend', 'back-end'],
+  fullstack: ['풀스택', 'fullstack', 'full-stack', 'full stack'],
+  mobile: ['모바일', 'mobile', 'android'],
 };
