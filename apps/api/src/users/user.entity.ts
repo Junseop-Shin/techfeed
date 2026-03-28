@@ -25,7 +25,7 @@ export class User {
   @Column({ nullable: true, unique: true })
   google_id: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   fcm_token: string | null;
 
   @CreateDateColumn()
