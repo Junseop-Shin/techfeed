@@ -14,6 +14,9 @@ export interface IContent {
   published_at: Date;
   es_indexed: boolean;
   created_at: Date;
+  company_name?: string;
+  position?: string;
+  position_hash?: string;
 }
 
 export type ContentDocument = IContent & Document;
@@ -31,6 +34,9 @@ const ContentSchema = new Schema<ContentDocument>(
     source_name: { type: String, required: true },
     published_at: { type: Date, required: true },
     es_indexed: { type: Boolean, default: false },
+    company_name: { type: String },
+    position: { type: String },
+    position_hash: { type: String, sparse: true },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: false } },
 );

@@ -39,11 +39,10 @@ export const youtubeSources = [
 ];
 
 export const jobSources = [
-  {
-    name: 'Wanted',
-    type: 'wanted-api' as const,
-    tags: ['job'],
-  },
+  { name: 'Wanted', type: 'wanted-api' as const, tags: ['job'] },
+  { name: 'Jumpit', type: 'jumpit-api' as const, tags: ['job'] },
+  { name: 'Programmers', type: 'programmers-api' as const, tags: ['job'] },
+  { name: 'Remember', type: 'remember-api' as const, tags: ['job'] },
 ];
 
 export const keywordTagMap: Record<string, string[]> = {
