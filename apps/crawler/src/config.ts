@@ -25,7 +25,7 @@ export const blogSources = [
   { name: '무신사 Tech', url: 'https://medium.com/feed/musinsa-tech', tags: ['musinsa'] },
 
   // 커뮤니티 / 미디어
-  { name: '긱뉴스', url: 'https://news.hada.io/rss', tags: ['news'] },
+  { name: 'Velog 트렌딩', url: 'https://v2.velog.io/rss', tags: ['news', 'velog'] },
   { name: '요즘IT', url: 'https://yozm.wishket.com/magazine/feed/', tags: ['news'] },
 ];
 
