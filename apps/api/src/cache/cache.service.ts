@@ -44,6 +44,14 @@ export class CacheService {
     await this.redis.client.set(`feed:${key}`, value, 'EX', FEED_TTL_SECONDS);
   }
 
+  async get(key: string): Promise<string | null> {
+    return this.redis.client.get(key);
+  }
+
+  async set(key: string, value: string, ttlSeconds: number): Promise<void> {
+    await this.redis.client.set(key, value, 'EX', ttlSeconds);
+  }
+
   async invalidateFeedCache(sourceType?: string): Promise<void> {
     const keys = sourceType
       ? [`feed:${sourceType}`]

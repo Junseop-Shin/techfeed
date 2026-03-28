@@ -1,7 +1,11 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import type { Content } from '../api/contents';
+import { getContentSummary } from '../api/contents';
+import { useBookmarks, useToggleBookmark } from '../hooks/useBookmark';
+import { useAuthStore } from '../store/auth.store';
 
 interface ContentCardProps {
   content: Content;
@@ -12,13 +16,44 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function BookmarkButton({ contentId }: { contentId: string }) {
+  const token = useAuthStore((s) => s.token);
+  const { data: bookmarkIds } = useBookmarks();
+  const { mutate: toggleBookmark } = useToggleBookmark();
+
+  if (!token) return null;
+
+  const isBookmarked = bookmarkIds?.has(contentId) ?? false;
+
+  const handlePress = () => {
+    toggleBookmark({ contentId, isBookmarked });
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.bookmarkButton}
+      onPress={handlePress}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={isBookmarked ? '북마크 해제' : '북마크 추가'}
+    >
+      <Text style={[styles.bookmarkIcon, isBookmarked && styles.bookmarkIconActive]}>
+        {isBookmarked ? '★' : '☆'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 function BlogCard({ content }: { content: Content }) {
   const hasThumbnail = !!content.thumbnail_url;
 
   return (
     <View style={[styles.cardInner, hasThumbnail && styles.cardInnerRow]}>
       <View style={hasThumbnail ? styles.blogTextBlock : undefined}>
-        <Text style={styles.sourceName}>{content.source_name}</Text>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sourceName}>{content.source_name}</Text>
+          <BookmarkButton contentId={content.id} />
+        </View>
         <Text style={styles.title} numberOfLines={hasThumbnail ? 3 : 2}>
           {content.title}
         </Text>
@@ -50,8 +85,23 @@ function BlogCard({ content }: { content: Content }) {
 }
 
 function YoutubeCard({ content }: { content: Content }) {
+  const [showSummary, setShowSummary] = useState(false);
+
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+    queryKey: ['summary', content.id],
+    queryFn: () => getContentSummary(content.id),
+    enabled: showSummary,
+    staleTime: 1000 * 60 * 60 * 24, // 24h — 요약은 자주 바뀌지 않음
+  });
+
   return (
     <View style={styles.cardInner}>
+      <View style={styles.rowBetween}>
+        <Text style={styles.sourceName}>
+          {content.channel_name ?? content.source_name}
+        </Text>
+        <BookmarkButton contentId={content.id} />
+      </View>
       {content.thumbnail_url && (
         <Image
           source={{ uri: content.thumbnail_url }}
@@ -60,9 +110,29 @@ function YoutubeCard({ content }: { content: Content }) {
         />
       )}
       <Text style={styles.title} numberOfLines={2}>{content.title}</Text>
-      <Text style={styles.sourceName}>
-        {content.channel_name ?? content.source_name}
-      </Text>
+
+      <TouchableOpacity
+        style={styles.summaryToggle}
+        onPress={() => setShowSummary((v) => !v)}
+        accessibilityRole="button"
+        accessibilityLabel={showSummary ? 'AI 요약 접기' : 'AI 요약 보기'}
+      >
+        <Text style={styles.summaryToggleText}>
+          {showSummary ? 'AI 요약 접기 ▲' : 'AI 요약 보기 ▼'}
+        </Text>
+      </TouchableOpacity>
+
+      {showSummary && (
+        <View style={styles.summaryBox}>
+          {summaryLoading ? (
+            <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 8 }} />
+          ) : summaryData?.summary ? (
+            <Text style={styles.summaryText}>{summaryData.summary}</Text>
+          ) : (
+            <Text style={styles.summaryEmpty}>요약을 불러올 수 없습니다.</Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -70,7 +140,10 @@ function YoutubeCard({ content }: { content: Content }) {
 function JobCard({ content }: { content: Content }) {
   return (
     <View style={styles.cardInner}>
-      <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
+      <View style={styles.rowBetween}>
+        <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
+        <BookmarkButton contentId={content.id} />
+      </View>
       <Text style={styles.title} numberOfLines={2}>
         {content.position ?? content.title}
       </Text>
@@ -125,6 +198,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   blogTextBlock: {
     flex: 1,
@@ -182,9 +261,40 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     fontWeight: '500',
   },
+  bookmarkButton: {
+    padding: 4,
+  },
+  bookmarkIcon: {
+    fontSize: 18,
+    color: '#D1D5DB',
+  },
+  bookmarkIconActive: {
+    color: '#F59E0B',
+  },
+  summaryToggle: {
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  summaryToggleText: {
+    fontSize: 12,
+    color: '#2563EB',
+    fontWeight: '500',
+  },
+  summaryBox: {
+    marginTop: 4,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
+  },
+  summaryText: {
+    fontSize: 13,
+    color: '#1E3A5F',
+    lineHeight: 20,
+  },
+  summaryEmpty: {
+    fontSize: 13,
+    color: '#9CA3AF',
+  },
 });
-
-/*
-Usage:
-<ContentCard content={content} />
-*/

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Put,
@@ -35,6 +36,7 @@ export class UsersController {
     return {
       id: user.id,
       email: user.email,
+      name: user.name,
       created_at: user.created_at,
       tags: user.subscriptions?.map((s) => s.tag) ?? [],
     };
@@ -55,6 +57,12 @@ export class UsersController {
     @Body() dto: UpdateFcmTokenDto,
   ) {
     await this.usersService.updateFcmToken(req.user.userId, dto.fcm_token);
+    return { success: true };
+  }
+
+  @Delete('fcm-token')
+  async removeFcmToken(@Request() req: { user: { userId: string } }) {
+    await this.usersService.removeFcmToken(req.user.userId);
     return { success: true };
   }
 }

@@ -16,8 +16,14 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ nullable: true })
+  name: string;
+
+  @Column({ nullable: true })
   password: string;
+
+  @Column({ nullable: true, unique: true })
+  google_id: string;
 
   @Column({ nullable: true })
   fcm_token: string;

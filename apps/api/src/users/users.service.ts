@@ -24,8 +24,8 @@ export class UsersService {
     });
   }
 
-  async create(email: string, hashedPassword: string): Promise<User> {
-    const user = this.userRepo.create({ email, password: hashedPassword });
+  async create(email: string, hashedPassword: string, name?: string): Promise<User> {
+    const user = this.userRepo.create({ email, password: hashedPassword, name });
     return this.userRepo.save(user);
   }
 
@@ -56,5 +56,32 @@ export class UsersService {
       .createQueryBuilder('user')
       .where('user.fcm_token IS NOT NULL')
       .getMany();
+  }
+
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { google_id: googleId } });
+  }
+
+  async findOrCreateGoogleUser(
+    googleId: string,
+    email: string,
+    name: string,
+  ): Promise<User> {
+    const existing = await this.findByGoogleId(googleId);
+    if (existing) return existing;
+
+    // email 중복 시 기존 계정에 google_id 연결
+    const byEmail = await this.findByEmail(email);
+    if (byEmail) {
+      await this.userRepo.update(byEmail.id, { google_id: googleId, name: byEmail.name ?? name });
+      return this.userRepo.findOne({ where: { id: byEmail.id } }) as Promise<User>;
+    }
+
+    const user = this.userRepo.create({ email, name, google_id: googleId });
+    return this.userRepo.save(user);
+  }
+
+  async removeFcmToken(userId: string): Promise<void> {
+    await this.userRepo.update(userId, { fcm_token: null });
   }
 }
