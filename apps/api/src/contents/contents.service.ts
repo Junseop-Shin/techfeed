@@ -91,7 +91,7 @@ export class ContentsService {
       throw new BadRequestException('AI summary is not configured');
     }
 
-    const model = this.gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = this.gemini.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const contentBody = (content as any).content_body ?? content.summary ?? '';
     const contentTypeLabel =
       content.type === 'youtube' ? 'YouTube 영상' : content.type === 'blog' ? '블로그 포스트' : '채용공고';
