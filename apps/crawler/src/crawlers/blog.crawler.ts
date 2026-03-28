@@ -2,7 +2,9 @@ import Parser from 'rss-parser';
 import { Client } from '@elastic/elasticsearch';
 import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
-import { blogSources } from '../config';
+import { blogSources, keywordTagMap } from '../config';
+
+const TECH_KEYWORDS = Object.values(keywordTagMap).flat();
 
 const parser = new Parser({
   customFields: {
@@ -33,8 +35,13 @@ export class BlogCrawler extends BaseCrawler {
         for (const item of feed.items) {
           if (!item.link || !item.title) continue;
 
-          // Filter non-Korean posts from Velog (Chinese spam)
-          if (source.name === 'Velog 트렌딩' && !hasKorean(item.title)) continue;
+          // Velog: Korean filter + tech keyword filter (스팸/비기술 글 제거)
+          if (source.name === 'Velog 트렌딩') {
+            if (!hasKorean(item.title)) continue;
+            const text = `${item.title} ${item.contentSnippet ?? ''}`.toLowerCase();
+            const isTech = TECH_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()));
+            if (!isTech) continue;
+          }
 
           results.push({
             type: 'blog',
