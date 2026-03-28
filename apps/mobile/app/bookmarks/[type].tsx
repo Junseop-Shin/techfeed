@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,54 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ContentCard } from '../../src/components/ContentCard';
 import { useAuthStore } from '../../src/store/auth.store';
+import { useThemeStore } from '../../src/store/theme.store';
 import { useBookmarksByType, useUpdateBookmarkStatus } from '../../src/hooks/useBookmark';
 import type { BookmarkItem } from '../../src/api/users';
+
+type ContentWithDeadline = { deadline?: string } & Record<string, unknown>;
+
+function getDDayLabel(deadline: string): { label: string; color: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(deadline);
+  end.setHours(0, 0, 0, 0);
+  const diff = Math.round((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diff < 0) return { label: '마감', color: '#9CA3AF' };
+  if (diff === 0) return { label: 'D-Day', color: '#EF4444' };
+  if (diff <= 3) return { label: `D-${diff}`, color: '#EF4444' };
+  if (diff <= 7) return { label: `D-${diff}`, color: '#F97316' };
+  return { label: `D-${diff}`, color: '#6B7280' };
+}
+
+function DDayBadge({ deadline }: { deadline: string }) {
+  const { label, color } = getDDayLabel(deadline);
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        badge: {
+          borderRadius: 4,
+          paddingHorizontal: 7,
+          paddingVertical: 3,
+          borderWidth: 1,
+          borderColor: color,
+          alignSelf: 'flex-start' as const,
+        },
+        text: {
+          fontSize: 11,
+          fontWeight: '700' as const,
+          color,
+        },
+      }),
+    [color]
+  );
+
+  return (
+    <View style={styles.badge}>
+      <Text style={styles.text}>{label}</Text>
+    </View>
+  );
+}
 
 type ContentTypeParam = 'blog' | 'youtube' | 'jobs';
 
@@ -75,6 +121,10 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowPr
   };
 
   const currentStatus = statusTabs.find((t) => t.value === item.status);
+  const deadline = item.content
+    ? (item.content as unknown as ContentWithDeadline).deadline
+    : undefined;
+  const isJobType = item.content_type === 'job';
 
   return (
     <TouchableOpacity
@@ -93,13 +143,14 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowPr
           </Text>
         </View>
       )}
-      {currentStatus && (
-        <View style={styles.statusBadgeWrapper}>
+      <View style={styles.statusBadgeWrapper}>
+        {isJobType && deadline && <DDayBadge deadline={deadline} />}
+        {currentStatus && (
           <View style={styles.statusBadge}>
             <Text style={styles.statusBadgeText}>{currentStatus.label}</Text>
           </View>
-        </View>
-      )}
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -318,6 +369,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     right: 28,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
   },
   statusBadge: {
     backgroundColor: '#EFF6FF',

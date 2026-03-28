@@ -6,6 +6,7 @@ import { ContentsController } from './contents.controller';
 import { ContentsService } from './contents.service';
 import { SearchModule } from '../search/search.module';
 import { AppCacheModule } from '../cache/cache.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AppCacheModule } from '../cache/cache.module';
     MongooseModule.forFeature([{ name: Content.name, schema: ContentSchema }]),
     SearchModule,
     AppCacheModule,
+    SubscriptionsModule,
   ],
   controllers: [ContentsController],
   providers: [ContentsService],

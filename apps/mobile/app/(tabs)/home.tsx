@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';
-import { useContents } from '../../src/hooks/useContents';
+import { useContents, useRecommended } from '../../src/hooks/useContents';
 import { useBookmarksByType } from '../../src/hooks/useBookmark';
+import { AuthBenefitsSheet } from '../../src/components/AuthBenefitsSheet';
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -154,6 +155,154 @@ function JobStats() {
   );
 }
 
+function RecommendedSection({ onShowBenefits }: { onShowBenefits: () => void }) {
+  const colors = useThemeStore((s) => s.colors);
+  const token = useAuthStore((s) => s.token);
+  const { data, isLoading } = useRecommended();
+  const items = data?.items?.slice(0, 5) ?? [];
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        sectionHeader: {
+          flexDirection: 'row' as const,
+          alignItems: 'center' as const,
+          justifyContent: 'space-between' as const,
+          marginBottom: 12,
+        },
+        sectionTitle: {
+          fontSize: 16,
+          fontWeight: '700' as const,
+          color: colors.textPrimary,
+        },
+        scrollRow: {
+          paddingLeft: 16,
+        },
+        card: {
+          width: 180,
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          padding: 14,
+          marginRight: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          elevation: 2,
+        },
+        cardSource: {
+          fontSize: 11,
+          color: colors.textSecondary,
+          fontWeight: '500' as const,
+          marginBottom: 6,
+        },
+        cardTitle: {
+          fontSize: 13,
+          fontWeight: '600' as const,
+          color: colors.textPrimary,
+          lineHeight: 18,
+          marginBottom: 8,
+          flex: 1,
+        },
+        cardDate: {
+          fontSize: 11,
+          color: colors.textTertiary,
+        },
+        skeletonCard: {
+          width: 180,
+          backgroundColor: colors.surfaceHigh,
+          borderRadius: 12,
+          padding: 14,
+          marginRight: 10,
+          height: 100,
+        },
+        skeletonLine: {
+          height: 10,
+          backgroundColor: colors.border,
+          borderRadius: 4,
+          marginBottom: 8,
+        },
+        banner: {
+          backgroundColor: colors.primaryDim,
+          borderRadius: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          flexDirection: 'row' as const,
+          alignItems: 'center' as const,
+          justifyContent: 'space-between' as const,
+        },
+        bannerText: {
+          fontSize: 14,
+          fontWeight: '600' as const,
+          color: colors.primary,
+        },
+        bannerArrow: {
+          fontSize: 14,
+          color: colors.primary,
+        },
+      }),
+    [colors]
+  );
+
+  if (!token) {
+    return (
+      <TouchableOpacity
+        style={styles.banner}
+        onPress={onShowBenefits}
+        accessibilityRole="button"
+        accessibilityLabel="맞춤 추천 받기"
+      >
+        <Text style={styles.bannerText}>맞춤 추천 받기</Text>
+        <Text style={styles.bannerArrow}>→</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>맞춤 추천</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollRow}
+      >
+        {isLoading
+          ? [0, 1, 2].map((i) => (
+              <View key={i} style={styles.skeletonCard}>
+                <View style={[styles.skeletonLine, { width: '50%' }]} />
+                <View style={[styles.skeletonLine, { width: '90%' }]} />
+                <View style={[styles.skeletonLine, { width: '70%' }]} />
+              </View>
+            ))
+          : items.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.card}
+                onPress={() => router.push(`/content/${item.id}`)}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+              >
+                <Text style={styles.cardSource} numberOfLines={1}>
+                  {item.source_name}
+                </Text>
+                <Text style={styles.cardTitle} numberOfLines={3}>
+                  {item.title}
+                </Text>
+                <Text style={styles.cardDate}>
+                  {new Date(item.published_at).toLocaleDateString('ko-KR', {
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+      </ScrollView>
+    </>
+  );
+}
+
 function RecentFeed() {
   const colors = useThemeStore((s) => s.colors);
   const { data, isLoading } = useContents({ limit: 5 });
@@ -202,6 +351,7 @@ export default function HomeScreen() {
   const colors = useThemeStore((s) => s.colors);
   const { token, user } = useAuthStore();
   const userName = user?.name ?? user?.email ?? null;
+  const [benefitsVisible, setBenefitsVisible] = useState(false);
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
@@ -289,6 +439,11 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* 맞춤 추천 섹션 */}
+        <View style={styles.section}>
+          <RecommendedSection onShowBenefits={() => setBenefitsVisible(true)} />
+        </View>
+
         {/* 오늘의 피드 섹션 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>오늘의 피드</Text>
@@ -305,6 +460,15 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <AuthBenefitsSheet
+        visible={benefitsVisible}
+        onClose={() => setBenefitsVisible(false)}
+        onSignIn={() => {
+          setBenefitsVisible(false);
+          router.push('/auth/login');
+        }}
+      />
     </SafeAreaView>
   );
 }

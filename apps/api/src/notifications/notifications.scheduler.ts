@@ -6,6 +6,7 @@ import { RedisProvider } from '../cache/redis.provider';
 import { Content, ContentDocument } from '../contents/content.schema';
 import { UsersService } from '../users/users.service';
 import { PushService } from '../push/push.service';
+import { BookmarksService } from '../bookmarks/bookmarks.service';
 
 const TRENDING_KEY = 'rank:contents';
 const TOP_N = 3;
@@ -20,6 +21,7 @@ export class NotificationsScheduler {
     private readonly contentModel: Model<ContentDocument>,
     private readonly usersService: UsersService,
     private readonly pushService: PushService,
+    private readonly bookmarksService: BookmarksService,
   ) {}
 
   // Every Monday at 09:00
@@ -54,6 +56,88 @@ export class NotificationsScheduler {
       this.logger.log(`Weekly trend push sent to ${tokens.length} users`);
     } catch (err) {
       this.logger.error('Failed to send weekly trend push', err);
+    }
+  }
+
+  // Every day at 09:00
+  @Cron('0 9 * * *')
+  async sendJobDeadlineAlerts(): Promise<void> {
+    this.logger.log('Running job deadline alert push notification');
+
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const d1 = new Date(today);
+      d1.setDate(today.getDate() + 1);
+
+      const d3 = new Date(today);
+      d3.setDate(today.getDate() + 3);
+
+      // PostgreSQL bookmarks: content_type='job', status NOT IN ('탈락','최종합격')
+      const bookmarks = await this.bookmarksService.findJobBookmarksForAlert();
+
+      if (bookmarks.length === 0) {
+        this.logger.log('No active job bookmarks — skipping deadline alerts');
+        return;
+      }
+
+      // Collect unique content_ids
+      const contentIds = [...new Set(bookmarks.map((b) => b.content_id))];
+
+      // MongoDB: fetch contents with deadline
+      const contents = await this.contentModel
+        .find({
+          _id: { $in: contentIds },
+          deadline: { $exists: true, $ne: null },
+        })
+        .select('_id title deadline company_name position')
+        .lean();
+
+      if (contents.length === 0) {
+        this.logger.log('No job contents with deadline — skipping');
+        return;
+      }
+
+      // Group bookmarks by content_id for quick lookup of users
+      const bookmarksByContentId = new Map<string, string[]>();
+      for (const b of bookmarks) {
+        const existing = bookmarksByContentId.get(b.content_id) ?? [];
+        existing.push(b.userId);
+        bookmarksByContentId.set(b.content_id, existing);
+      }
+
+      for (const content of contents) {
+        const deadline = new Date(content.deadline as Date);
+        deadline.setHours(0, 0, 0, 0);
+
+        const diffMs = deadline.getTime() - today.getTime();
+        const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays !== 1 && diffDays !== 3) continue;
+
+        const contentIdStr = String(content._id);
+        const userIds = bookmarksByContentId.get(contentIdStr) ?? [];
+        if (userIds.length === 0) continue;
+
+        const companyName = (content.company_name as string | undefined) ?? '채용공고';
+        const position = (content.position as string | undefined) ?? content.title;
+        const pushTitle = `[${companyName}] 지원 마감 D-${diffDays}`;
+        const pushBody = `${position} 마감 D-${diffDays}일 남았습니다`;
+
+        for (const userId of userIds) {
+          const user = await this.usersService.findById(userId);
+          if (!user?.fcm_token) continue;
+
+          await this.pushService.send(user.fcm_token, pushTitle, pushBody, {
+            contentId: contentIdStr,
+          });
+        }
+
+        this.logger.log(`Job deadline alert sent for content ${contentIdStr} (D-${diffDays})`);
+      }
+    } catch (err) {
+      this.logger.error('Failed to send job deadline alerts', err);
     }
   }
 }
