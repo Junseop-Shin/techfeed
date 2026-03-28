@@ -4,6 +4,7 @@ import {
   getTrending,
   getContentById,
   autocomplete,
+  getRecommended,
   type ContentsParams,
 } from '../api/contents';
 
@@ -32,3 +33,6 @@ export const useAutocomplete = (q: string) =>
     queryFn: () => autocomplete(q),
     enabled: q.length > 0,
   });
+
+export const useRecommended = () =>
+  useQuery({ queryKey: ['contents', 'recommended'], queryFn: getRecommended });

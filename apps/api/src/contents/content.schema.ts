@@ -41,6 +41,15 @@ export class Content {
 
   @Prop()
   created_at: Date;
+
+  @Prop()
+  deadline?: Date;
+
+  @Prop()
+  company_name?: string;
+
+  @Prop()
+  position?: string;
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

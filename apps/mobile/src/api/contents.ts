@@ -58,6 +58,9 @@ export const autocomplete = (q: string): Promise<string[]> =>
 export const getContentSummary = (id: string): Promise<{ summary: string }> =>
   apiClient.get(`/contents/${id}/summary`).then((r) => r.data);
 
+export const getRecommended = (): Promise<ContentsResponse> =>
+  apiClient.get('/contents/recommended').then((r) => r.data);
+
 export const trackEvent = (events: EventPayload[]): void => {
   apiClient.post('/events', events).catch(() => {
     // Silently fail — event tracking must not disrupt user experience

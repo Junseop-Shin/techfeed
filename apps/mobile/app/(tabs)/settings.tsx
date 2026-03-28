@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,18 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TagChip } from '../../src/components/TagChip';
+import { AuthBenefitsSheet } from '../../src/components/AuthBenefitsSheet';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useThemeStore } from '../../src/store/theme.store';
-import { getProfile, updateTags, subscribePush, removePushToken } from '../../src/api/users';
+import {
+  getProfile,
+  updateTags,
+  subscribePush,
+  removePushToken,
+  getUserStats,
+  getUserPreferences,
+  updateUserPreferences,
+} from '../../src/api/users';
 
 async function getAndRegisterPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
@@ -33,6 +42,7 @@ export default function SettingsScreen() {
   const { theme, setTheme, colors } = useThemeStore();
   const queryClient = useQueryClient();
   const [newTag, setNewTag] = useState('');
+  const [benefitsVisible, setBenefitsVisible] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile'],
@@ -40,13 +50,44 @@ export default function SettingsScreen() {
     enabled: !!token,
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['userStats'],
+    queryFn: getUserStats,
+    enabled: !!token,
+  });
+
+  const { data: preferences } = useQuery({
+    queryKey: ['userPreferences'],
+    queryFn: getUserPreferences,
+    enabled: !!token,
+  });
+
   const [tags, setTags] = useState<string[]>([]);
+  const [channels, setChannels] = useState<string[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (profile?.tags) {
       setTags(profile.tags);
     }
   }, [profile?.tags]);
+
+  useEffect(() => {
+    if (preferences?.channels) {
+      setChannels(preferences.channels);
+    }
+  }, [preferences?.channels]);
+
+  const handleChannelToggle = (channel: string) => {
+    setChannels((prev) => {
+      const next = prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel];
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        updateUserPreferences({ channels: next }).catch(() => {});
+      }, 500);
+      return next;
+    });
+  };
 
   const { mutate: saveTags, isPending: isSaving } = useMutation({
     mutationFn: updateTags,
@@ -251,6 +292,64 @@ export default function SettingsScreen() {
     },
     dangerButtonText: { fontSize: 15, color: '#EF4444', fontWeight: '500' as const },
     buttonDisabled: { opacity: 0.6 },
+    // stats card
+    statsCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    statsRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 16,
+      marginBottom: 12,
+    },
+    statItem: {
+      flex: 1,
+    },
+    statValue: {
+      fontSize: 20,
+      fontWeight: '700' as const,
+      color: colors.textPrimary,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    topTagsLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    progressRow: {
+      marginBottom: 6,
+    },
+    progressLabel: {
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between' as const,
+      marginBottom: 3,
+    },
+    progressTagText: {
+      fontSize: 12,
+      color: colors.textPrimary,
+      fontWeight: '500' as const,
+    },
+    progressPct: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    progressTrack: {
+      height: 4,
+      backgroundColor: colors.border,
+      borderRadius: 2,
+      overflow: 'hidden' as const,
+    },
+    progressFill: {
+      height: 4,
+      borderRadius: 2,
+    },
   }), [colors]);
 
   if (!token) {
@@ -263,7 +362,7 @@ export default function SettingsScreen() {
           <Text style={styles.message}>로그인하면 더 많은 기능을 사용할 수 있습니다.</Text>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={() => router.push('/auth/login')}
+            onPress={() => setBenefitsVisible(true)}
             accessibilityRole="button"
           >
             <Text style={styles.primaryButtonText}>로그인</Text>
@@ -276,6 +375,14 @@ export default function SettingsScreen() {
             <Text style={styles.secondaryButtonText}>회원가입</Text>
           </TouchableOpacity>
         </View>
+        <AuthBenefitsSheet
+          visible={benefitsVisible}
+          onClose={() => setBenefitsVisible(false)}
+          onSignIn={() => {
+            setBenefitsVisible(false);
+            router.push('/auth/login');
+          }}
+        />
       </SafeAreaView>
     );
   }
@@ -302,6 +409,62 @@ export default function SettingsScreen() {
             <Text style={styles.dangerButtonText}>로그아웃</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 독서 통계 */}
+        {stats && (
+          <View style={styles.statsCard}>
+            <Text style={styles.sectionLabel}>독서 통계</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.week_reads}</Text>
+                <Text style={styles.statLabel}>이번 주 읽음</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>🔥 {stats.streak_days}일</Text>
+                <Text style={styles.statLabel}>연속 읽기</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.total_reads}</Text>
+                <Text style={styles.statLabel}>전체 읽음</Text>
+              </View>
+            </View>
+            {stats.tag_distribution.length > 0 && (
+              <>
+                <Text style={styles.topTagsLabel}>
+                  가장 많이 읽은 태그:{' '}
+                  {stats.tag_distribution
+                    .slice(0, 2)
+                    .map((t) => t.tag)
+                    .join(', ')}
+                </Text>
+                {stats.tag_distribution.slice(0, 4).map((t, i) => {
+                  const opacityLevels = [1, 0.75, 0.5, 0.35];
+                  const opacity = opacityLevels[i] ?? 0.35;
+                  return (
+                    <View key={t.tag} style={styles.progressRow}>
+                      <View style={styles.progressLabel}>
+                        <Text style={styles.progressTagText}>{t.tag}</Text>
+                        <Text style={styles.progressPct}>{t.percentage}%</Text>
+                      </View>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: `${t.percentage}%`,
+                              backgroundColor: colors.primary,
+                              opacity,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+          </View>
+        )}
 
         {/* 화면 설정 */}
         <View style={styles.section}>
