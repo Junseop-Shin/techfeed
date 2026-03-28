@@ -4,13 +4,13 @@ import { DataSource, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Subscription } from '../subscriptions/subscription.entity';
 
-interface TagDistributionItem {
+export interface TagDistributionItem {
   tag: string;
   count: number;
   percentage: number;
 }
 
-interface UserStats {
+export interface UserStats {
   week_reads: number;
   total_reads: number;
   tag_distribution: TagDistributionItem[];
