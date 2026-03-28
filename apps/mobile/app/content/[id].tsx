@@ -6,16 +6,20 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
 import { trackEvent } from '../../src/api/contents';
+import { useThemeStore } from '../../src/store/theme.store';
+import { CommentSection } from '../../src/components/CommentSection';
 
 export default function ContentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: content, isLoading, isError } = useContentById(id ?? '');
   const enteredAtRef = useRef<number>(Date.now());
+  const colors = useThemeStore((s) => s.colors);
 
   useEffect(() => {
     if (!id) return;
@@ -39,9 +43,9 @@ export default function ContentDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -49,15 +53,15 @@ export default function ContentDetailScreen() {
 
   if (isError || !content) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <View style={styles.center}>
-          <Text style={styles.errorText}>콘텐츠를 불러올 수 없습니다.</Text>
+          <Text style={[styles.errorText, { color: colors.danger }]}>콘텐츠를 불러올 수 없습니다.</Text>
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => router.back()}
             accessibilityRole="button"
           >
-            <Text style={styles.backButtonText}>돌아가기</Text>
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>돌아가기</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -65,17 +69,19 @@ export default function ContentDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <View style={styles.content}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.meta}>
-          <Text style={styles.sourceType}>{sourceTypeLabel(content.source_type)}</Text>
-          <Text style={styles.sourceName}>{content.source_name}</Text>
+          <Text style={[styles.sourceType, { color: colors.primary, backgroundColor: colors.primaryDim }]}>
+            {sourceTypeLabel(content.source_type)}
+          </Text>
+          <Text style={[styles.sourceName, { color: colors.textSecondary }]}>{content.source_name}</Text>
         </View>
 
-        <Text style={styles.title}>{content.title}</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>{content.title}</Text>
 
         {content.published_at && (
-          <Text style={styles.date}>
+          <Text style={[styles.date, { color: colors.textTertiary }]}>
             {new Date(content.published_at).toLocaleDateString('ko-KR', {
               year: 'numeric',
               month: 'long',
@@ -87,27 +93,35 @@ export default function ContentDetailScreen() {
         {content.tags.length > 0 && (
           <View style={styles.tagRow}>
             {content.tags.map((tag) => (
-              <View key={tag} style={styles.tagBadge}>
-                <Text style={styles.tagText}>{tag}</Text>
+              <View key={tag} style={[styles.tagBadge, { backgroundColor: colors.primaryDim }]}>
+                <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
               </View>
             ))}
           </View>
         )}
 
-        <View style={styles.divider} />
+        {content.summary && (
+          <View style={[styles.summaryBox, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
+            <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{content.summary}</Text>
+          </View>
+        )}
 
-        <Text style={styles.urlLabel}>원문 링크</Text>
-        <Text style={styles.url} numberOfLines={2}>{content.url}</Text>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        <Text style={[styles.urlLabel, { color: colors.textSecondary }]}>원문 링크</Text>
+        <Text style={[styles.url, { color: colors.primary }]} numberOfLines={2}>{content.url}</Text>
 
         <TouchableOpacity
-          style={styles.openButton}
+          style={[styles.openButton, { backgroundColor: colors.primary }]}
           onPress={handleOpenExternal}
           accessibilityRole="button"
           accessibilityLabel="원문 열기"
         >
           <Text style={styles.openButtonText}>원문 보기</Text>
         </TouchableOpacity>
-      </View>
+
+        <CommentSection contentId={content.id} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -124,52 +138,46 @@ function sourceTypeLabel(type: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   content: {
-    flex: 1,
     padding: 20,
+    paddingBottom: 40,
   },
   meta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     marginBottom: 12,
+    marginRight: 8,
   },
   sourceType: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2563EB',
-    backgroundColor: '#EFF6FF',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
     overflow: 'hidden',
+    marginRight: 8,
   },
   sourceName: {
     fontSize: 13,
-    color: '#6B7280',
     fontWeight: '500',
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
     lineHeight: 30,
     marginBottom: 8,
   },
   date: {
     fontSize: 13,
-    color: '#9CA3AF',
     marginBottom: 12,
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   tagBadge: {
-    backgroundColor: '#F3F4F6',
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -178,33 +186,39 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: 12,
-    color: '#374151',
     fontWeight: '500',
+  },
+  summaryBox: {
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+  },
+  summaryText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
   divider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
     marginVertical: 20,
   },
   urlLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   url: {
     fontSize: 13,
-    color: '#2563EB',
     marginBottom: 20,
     lineHeight: 18,
   },
   openButton: {
-    backgroundColor: '#2563EB',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
+    marginBottom: 8,
   },
   openButtonText: {
     color: '#FFFFFF',
@@ -218,7 +232,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 15,
-    color: '#EF4444',
     marginBottom: 16,
   },
   backButton: {
@@ -227,6 +240,5 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 14,
-    color: '#2563EB',
   },
 });
