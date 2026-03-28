@@ -40,6 +40,7 @@ export interface ContentsParams {
   tags?: string;
   source_type?: string;
   page?: number;
+  limit?: number;
 }
 
 export const getContents = (params: ContentsParams): Promise<ContentsResponse> =>
