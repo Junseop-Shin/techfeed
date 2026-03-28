@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { getContentSummary } from '../api/contents';
 import { useBookmarks, useToggleBookmark } from '../hooks/useBookmark';
 import { addBookmarkWithType } from '../api/users';
 import { useAuthStore } from '../store/auth.store';
+import { useThemeStore } from '../store/theme.store';
 
 interface ContentCardProps {
   content: Content;
@@ -19,6 +20,7 @@ function formatDate(dateStr: string): string {
 
 function BookmarkButton({ contentId, sourceType }: { contentId: string; sourceType: string }) {
   const token = useAuthStore((s) => s.token);
+  const colors = useThemeStore((s) => s.colors);
   const { data: bookmarkIds } = useBookmarks();
   const { mutate: toggleBookmark } = useToggleBookmark();
 
@@ -28,36 +30,58 @@ function BookmarkButton({ contentId, sourceType }: { contentId: string; sourceTy
 
   const handlePress = () => {
     if (!isBookmarked && sourceType) {
-      // Add with content type so the backend can categorise the bookmark
-      addBookmarkWithType(contentId, sourceType).catch(() => {
-        // Fallback: optimistic update still proceeds via toggleBookmark
-      });
+      addBookmarkWithType(contentId, sourceType).catch(() => {});
     }
     toggleBookmark({ contentId, isBookmarked });
   };
 
   return (
     <TouchableOpacity
-      style={styles.bookmarkButton}
+      style={bookmarkStyles.bookmarkButton}
       onPress={handlePress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={isBookmarked ? '북마크 해제' : '북마크 추가'}
     >
-      <Text style={[styles.bookmarkIcon, isBookmarked && styles.bookmarkIconActive]}>
+      <Text style={[bookmarkStyles.bookmarkIcon, isBookmarked && { color: colors.bookmark }]}>
         {isBookmarked ? '★' : '☆'}
       </Text>
     </TouchableOpacity>
   );
 }
 
+const bookmarkStyles = StyleSheet.create({
+  bookmarkButton: { padding: 4 },
+  bookmarkIcon: { fontSize: 18, color: '#D1D5DB' },
+});
+
 function BlogCard({ content }: { content: Content }) {
+  const colors = useThemeStore((s) => s.colors);
   const hasThumbnail = !!content.thumbnail_url;
 
+  const styles = useMemo(() => StyleSheet.create({
+    sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
+    title: { fontSize: 16, fontWeight: '600' as const, color: colors.textPrimary, lineHeight: 22, marginBottom: 6 },
+    summary: { fontSize: 13, color: colors.textSecondary, lineHeight: 18, marginBottom: 4 },
+    meta: { flexDirection: 'row' as const, marginTop: 4 },
+    metaText: { fontSize: 12, color: colors.textTertiary },
+    tagRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, marginTop: 8 },
+    tagBadge: {
+      backgroundColor: colors.primaryDim,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      marginRight: 6,
+      marginBottom: 4,
+    },
+    tagText: { fontSize: 11, color: colors.primary, fontWeight: '500' as const },
+    blogThumbnail: { width: 80, height: 80, borderRadius: 8, backgroundColor: colors.searchBg, flexShrink: 0 },
+  }), [colors]);
+
   return (
-    <View style={[styles.cardInner, hasThumbnail && styles.cardInnerRow]}>
-      <View style={hasThumbnail ? styles.blogTextBlock : undefined}>
-        <View style={styles.rowBetween}>
+    <View style={[cardStyles.cardInner, hasThumbnail && cardStyles.cardInnerRow]}>
+      <View style={hasThumbnail ? cardStyles.blogTextBlock : undefined}>
+        <View style={cardStyles.rowBetween}>
           <Text style={styles.sourceName}>{content.source_name}</Text>
           <BookmarkButton contentId={content.id} sourceType={content.source_type} />
         </View>
@@ -97,18 +121,37 @@ function BlogCard({ content }: { content: Content }) {
 }
 
 function YoutubeCard({ content }: { content: Content }) {
+  const colors = useThemeStore((s) => s.colors);
   const [showSummary, setShowSummary] = useState(false);
 
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['summary', content.id],
     queryFn: () => getContentSummary(content.id),
     enabled: showSummary,
-    staleTime: 1000 * 60 * 60 * 24, // 24h — 요약은 자주 바뀌지 않음
+    staleTime: 1000 * 60 * 60 * 24,
   });
 
+  const styles = useMemo(() => StyleSheet.create({
+    sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
+    thumbnail: { width: '100%' as const, height: 180, borderRadius: 8, marginBottom: 12, backgroundColor: colors.searchBg },
+    title: { fontSize: 16, fontWeight: '600' as const, color: colors.textPrimary, lineHeight: 22, marginBottom: 6 },
+    summaryToggle: { marginTop: 10, paddingVertical: 6 },
+    summaryToggleText: { fontSize: 12, color: colors.primary, fontWeight: '500' as const },
+    summaryBox: {
+      marginTop: 4,
+      backgroundColor: colors.primaryDim,
+      borderRadius: 8,
+      padding: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    summaryText: { fontSize: 13, color: colors.textPrimary, lineHeight: 20 },
+    summaryEmpty: { fontSize: 13, color: colors.textSecondary },
+  }), [colors]);
+
   return (
-    <View style={styles.cardInner}>
-      <View style={styles.rowBetween}>
+    <View style={cardStyles.cardInner}>
+      <View style={cardStyles.rowBetween}>
         <Text style={styles.sourceName}>
           {content.channel_name ?? content.source_name}
         </Text>
@@ -137,7 +180,7 @@ function YoutubeCard({ content }: { content: Content }) {
       {showSummary && (
         <View style={styles.summaryBox}>
           {summaryLoading ? (
-            <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 8 }} />
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
           ) : summaryData?.summary ? (
             <Text style={styles.summaryText}>{summaryData.summary}</Text>
           ) : (
@@ -150,9 +193,28 @@ function YoutubeCard({ content }: { content: Content }) {
 }
 
 function JobCard({ content }: { content: Content }) {
+  const colors = useThemeStore((s) => s.colors);
+
+  const styles = useMemo(() => StyleSheet.create({
+    sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
+    title: { fontSize: 16, fontWeight: '600' as const, color: colors.textPrimary, lineHeight: 22, marginBottom: 6 },
+    jobLocation: { fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
+    tagRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, marginTop: 8 },
+    tagBadge: {
+      backgroundColor: colors.primaryDim,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      marginRight: 6,
+      marginBottom: 4,
+    },
+    tagText: { fontSize: 11, color: colors.primary, fontWeight: '500' as const },
+    metaText: { fontSize: 12, color: colors.textTertiary },
+  }), [colors]);
+
   return (
-    <View style={styles.cardInner}>
-      <View style={styles.rowBetween}>
+    <View style={cardStyles.cardInner}>
+      <View style={cardStyles.rowBetween}>
         <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
         <BookmarkButton contentId={content.id} sourceType={content.source_type} />
       </View>
@@ -179,13 +241,15 @@ function JobCard({ content }: { content: Content }) {
 }
 
 export function ContentCard({ content }: ContentCardProps) {
+  const colors = useThemeStore((s) => s.colors);
+
   const handlePress = () => {
     router.push(`/content/${content.id}`);
   };
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[cardStyles.card, { backgroundColor: colors.surface }]}
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={content.title}
@@ -197,9 +261,8 @@ export function ContentCard({ content }: ContentCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const cardStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginHorizontal: 16,
     marginVertical: 6,
@@ -209,9 +272,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  cardInner: {
-    padding: 16,
-  },
+  cardInner: { padding: 16 },
   cardInnerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -223,107 +284,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 2,
   },
-  blogTextBlock: {
-    flex: 1,
-  },
-  blogThumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    flexShrink: 0,
-  },
-  thumbnail: {
-    width: '100%',
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 12,
-    backgroundColor: '#F3F4F6',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  sourceName: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  meta: {
-    flexDirection: 'row',
-    marginTop: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  summary: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  jobLocation: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 6,
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  tagBadge: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  tagText: {
-    fontSize: 11,
-    color: '#2563EB',
-    fontWeight: '500',
-  },
-  bookmarkButton: {
-    padding: 4,
-  },
-  bookmarkIcon: {
-    fontSize: 18,
-    color: '#D1D5DB',
-  },
-  bookmarkIconActive: {
-    color: '#F59E0B',
-  },
-  summaryToggle: {
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  summaryToggleText: {
-    fontSize: 12,
-    color: '#2563EB',
-    fontWeight: '500',
-  },
-  summaryBox: {
-    marginTop: 4,
-    backgroundColor: '#F0F9FF',
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#2563EB',
-  },
-  summaryText: {
-    fontSize: 13,
-    color: '#1E3A5F',
-    lineHeight: 20,
-  },
-  summaryEmpty: {
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
+  blogTextBlock: { flex: 1 },
 });

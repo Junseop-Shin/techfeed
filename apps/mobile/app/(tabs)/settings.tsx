@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import * as Device from 'expo-device';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TagChip } from '../../src/components/TagChip';
 import { useAuthStore } from '../../src/store/auth.store';
+import { useThemeStore } from '../../src/store/theme.store';
 import { getProfile, updateTags, subscribePush, removePushToken } from '../../src/api/users';
 
 async function getAndRegisterPushToken(): Promise<string | null> {
@@ -29,6 +30,7 @@ async function getAndRegisterPushToken(): Promise<string | null> {
 
 export default function SettingsScreen() {
   const { token, user, logout, pushEnabled, setPushEnabled } = useAuthStore();
+  const { theme, setTheme, colors } = useThemeStore();
   const queryClient = useQueryClient();
   const [newTag, setNewTag] = useState('');
 
@@ -106,6 +108,151 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    header: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700' as const, color: colors.textPrimary },
+    content: { padding: 16 },
+    section: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '700' as const,
+      color: colors.textSecondary,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 0.5,
+      marginBottom: 12,
+    },
+    sectionDescription: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginBottom: 12,
+      lineHeight: 18,
+    },
+    profileCard: { marginBottom: 16 },
+    profileName: {
+      fontSize: 17,
+      fontWeight: '600' as const,
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    profileEmail: { fontSize: 14, color: colors.textSecondary },
+    settingRow: {
+      flexDirection: 'row' as const,
+      justifyContent: 'space-between' as const,
+      alignItems: 'center' as const,
+      paddingVertical: 4,
+    },
+    settingTitle: {
+      fontSize: 15,
+      fontWeight: '500' as const,
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    settingDescription: { fontSize: 12, color: colors.textSecondary },
+    // theme segmented control
+    themeRow: {
+      flexDirection: 'row' as const,
+      gap: 8,
+      marginTop: 4,
+    },
+    themeBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      backgroundColor: colors.searchBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    themeBtnActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    themeBtnText: { fontSize: 14, fontWeight: '500' as const, color: colors.textSecondary },
+    themeBtnTextActive: { color: '#FFFFFF', fontWeight: '600' as const },
+    tagList: {
+      flexDirection: 'row' as const,
+      flexWrap: 'wrap' as const,
+      marginBottom: 12,
+    },
+    addTagRow: {
+      flexDirection: 'row' as const,
+      gap: 8,
+      marginBottom: 12,
+    },
+    tagInput: {
+      flex: 1,
+      backgroundColor: colors.searchBg,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    addButton: {
+      backgroundColor: colors.primaryDim,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      justifyContent: 'center' as const,
+    },
+    addButtonText: { fontSize: 14, fontWeight: '600' as const, color: colors.primary },
+    center: {
+      flex: 1,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      paddingHorizontal: 24,
+    },
+    message: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: 'center' as const,
+      marginBottom: 24,
+      lineHeight: 22,
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 13,
+      borderRadius: 10,
+      alignItems: 'center' as const,
+      width: '100%' as const,
+      marginBottom: 10,
+    },
+    primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' as const },
+    secondaryButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 13,
+      borderRadius: 10,
+      alignItems: 'center' as const,
+      width: '100%' as const,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    secondaryButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '500' as const },
+    dangerButton: {
+      borderWidth: 1,
+      borderColor: '#FCA5A5',
+      borderRadius: 8,
+      paddingVertical: 12,
+      alignItems: 'center' as const,
+    },
+    dangerButtonText: { fontSize: 15, color: '#EF4444', fontWeight: '500' as const },
+    buttonDisabled: { opacity: 0.6 },
+  }), [colors]);
+
   if (!token) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -156,6 +303,41 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 화면 설정 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>화면 설정</Text>
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingTitle}>테마</Text>
+              <Text style={styles.settingDescription}>앱 색상 테마를 선택하세요</Text>
+            </View>
+          </View>
+          <View style={styles.themeRow}>
+            <TouchableOpacity
+              style={[styles.themeBtn, theme === 'dark' && styles.themeBtnActive]}
+              onPress={() => setTheme('dark')}
+              accessibilityRole="button"
+              accessibilityLabel="다크 테마"
+              accessibilityState={{ selected: theme === 'dark' }}
+            >
+              <Text style={[styles.themeBtnText, theme === 'dark' && styles.themeBtnTextActive]}>
+                🌙 다크
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.themeBtn, theme === 'light' && styles.themeBtnActive]}
+              onPress={() => setTheme('light')}
+              accessibilityRole="button"
+              accessibilityLabel="라이트 테마"
+              accessibilityState={{ selected: theme === 'light' }}
+            >
+              <Text style={[styles.themeBtnText, theme === 'light' && styles.themeBtnTextActive]}>
+                ☀️ 라이트
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* 알림 설정 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>알림 설정</Text>
@@ -167,8 +349,8 @@ export default function SettingsScreen() {
             <Switch
               value={pushEnabled}
               onValueChange={handleTogglePush}
-              trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-              thumbColor={pushEnabled ? '#2563EB' : '#F3F4F6'}
+              trackColor={{ false: colors.border, true: '#93C5FD' }}
+              thumbColor={pushEnabled ? colors.primary : colors.searchBg}
             />
           </View>
         </View>
@@ -180,7 +362,7 @@ export default function SettingsScreen() {
             관심 있는 기술 태그를 등록하면 맞춤 피드를 받을 수 있습니다.
           </Text>
           {isLoading ? (
-            <ActivityIndicator color="#2563EB" style={{ marginVertical: 12 }} />
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
           ) : (
             <>
               <View style={styles.tagList}>
@@ -199,7 +381,7 @@ export default function SettingsScreen() {
                   value={newTag}
                   onChangeText={setNewTag}
                   placeholder="태그 추가..."
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textSecondary}
                   onSubmitEditing={handleAddTag}
                   returnKeyType="done"
                   accessibilityLabel="태그 입력"
@@ -234,161 +416,3 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  content: {
-    padding: 16,
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  sectionDescription: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  profileCard: {
-    marginBottom: 16,
-  },
-  profileName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  profileEmail: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  settingTitle: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  settingDescription: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  tagList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  addTagRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  tagInput: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#111827',
-  },
-  addButton: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  message: {
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  primaryButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    borderRadius: 10,
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 10,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    borderRadius: 10,
-    alignItems: 'center',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  secondaryButtonText: {
-    color: '#374151',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  dangerButton: {
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  dangerButtonText: {
-    fontSize: 15,
-    color: '#EF4444',
-    fontWeight: '500',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-});

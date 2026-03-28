@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
+import { useThemeStore } from '../store/theme.store';
 
 export type SourceType = 'all' | 'blog' | 'youtube' | 'job';
 
@@ -16,6 +17,27 @@ interface SourceTypeTabsProps {
 }
 
 export function SourceTypeTabs({ selected, onChange }: SourceTypeTabsProps) {
+  const colors = useThemeStore((s) => s.colors);
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    content: { paddingHorizontal: 16 },
+    tab: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginRight: 4,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabSelected: { borderBottomColor: colors.primary },
+    label: { fontSize: 14, fontWeight: '500' as const, color: colors.textSecondary },
+    labelSelected: { color: colors.primary },
+  }), [colors]);
+
   return (
     <ScrollView
       horizontal
@@ -40,37 +62,3 @@ export function SourceTypeTabs({ selected, onChange }: SourceTypeTabsProps) {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    paddingHorizontal: 16,
-  },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 4,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabSelected: {
-    borderBottomColor: '#2563EB',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  labelSelected: {
-    color: '#2563EB',
-  },
-});
-
-/*
-Usage:
-<SourceTypeTabs selected="blog" onChange={(type) => setSourceType(type)} />
-*/
