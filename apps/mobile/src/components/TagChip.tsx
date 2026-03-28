@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useThemeStore } from '../store/theme.store';
 
 interface TagChipProps {
   label: string;
@@ -8,6 +9,33 @@ interface TagChipProps {
 }
 
 export function TagChip({ label, selected = false, onPress }: TagChipProps) {
+  const colors = useThemeStore((s) => s.colors);
+
+  const styles = useMemo(() => StyleSheet.create({
+    chip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.searchBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    chipSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    label: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500' as const,
+    },
+    labelSelected: {
+      color: '#FFFFFF',
+    },
+  }), [colors]);
+
   return (
     <TouchableOpacity
       style={[styles.chip, selected && styles.chipSelected]}
@@ -22,33 +50,3 @@ export function TagChip({ label, selected = false, onPress }: TagChipProps) {
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  chipSelected: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  label: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  labelSelected: {
-    color: '#FFFFFF',
-  },
-});
-
-/*
-Usage:
-<TagChip label="React" selected={true} onPress={() => toggleTag('React')} />
-*/

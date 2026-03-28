@@ -7,6 +7,7 @@ import { Model } from 'mongoose';
 import { Content, ContentDocument } from './content.schema';
 import { SearchService, SearchContentsOptions } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
 
@@ -19,6 +20,7 @@ export class ContentsService {
     private readonly searchService: SearchService,
     private readonly cacheService: CacheService,
     private readonly configService: ConfigService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     this.gemini = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -109,5 +111,54 @@ ${content.summary ? `설명: ${content.summary}` : ''}
     await this.cacheService.set(cacheKey, summary, SUMMARY_CACHE_TTL);
 
     return { summary };
+  }
+
+  async getRecommended(userId: string | null, limit = 20) {
+    if (!userId) {
+      return this.contentModel
+        .find()
+        .sort({ published_at: -1 })
+        .limit(limit)
+        .lean()
+        .exec();
+    }
+
+    const subscriptions = await this.subscriptionsService.findByUserId(userId);
+
+    if (subscriptions.length === 0) {
+      return this.contentModel
+        .find()
+        .sort({ published_at: -1 })
+        .limit(limit)
+        .lean()
+        .exec();
+    }
+
+    const tagSubs = subscriptions.filter((s) => s.type === 'tag').map((s) => s.tag);
+    const channelSubs = subscriptions.filter((s) => s.type === 'channel').map((s) => s.tag);
+
+    const orConditions: Record<string, unknown>[] = [];
+    if (tagSubs.length > 0) {
+      orConditions.push({ tags: { $in: tagSubs } });
+    }
+    if (channelSubs.length > 0) {
+      orConditions.push({ source_name: { $in: channelSubs } });
+    }
+
+    if (orConditions.length === 0) {
+      return this.contentModel
+        .find()
+        .sort({ published_at: -1 })
+        .limit(limit)
+        .lean()
+        .exec();
+    }
+
+    return this.contentModel
+      .find({ $or: orConditions })
+      .sort({ published_at: -1 })
+      .limit(limit)
+      .lean()
+      .exec();
   }
 }

@@ -46,3 +46,24 @@ export const subscribePush = (token: string): Promise<void> =>
 
 export const removePushToken = (): Promise<void> =>
   apiClient.delete('/users/me/fcm-token').then((r) => r.data);
+
+export interface UserStats {
+  week_reads: number;
+  total_reads: number;
+  tag_distribution: { tag: string; count: number; percentage: number }[];
+  streak_days: number;
+}
+
+export interface UserPreferences {
+  channels: string[];
+  subjects: string[];
+}
+
+export const getUserStats = (): Promise<UserStats> =>
+  apiClient.get('/users/me/stats').then((r) => r.data);
+
+export const getUserPreferences = (): Promise<UserPreferences> =>
+  apiClient.get('/users/me/preferences').then((r) => r.data);
+
+export const updateUserPreferences = (prefs: Partial<UserPreferences>): Promise<void> =>
+  apiClient.patch('/users/me/preferences', prefs).then((r) => r.data);

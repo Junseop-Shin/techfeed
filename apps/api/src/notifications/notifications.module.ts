@@ -4,6 +4,7 @@ import { Content, ContentSchema } from '../contents/content.schema';
 import { UsersModule } from '../users/users.module';
 import { PushModule } from '../push/push.module';
 import { AppCacheModule } from '../cache/cache.module';
+import { BookmarksModule } from '../bookmarks/bookmarks.module';
 import { NotificationsService } from './notifications.service';
 import { NotificationsScheduler } from './notifications.scheduler';
 
@@ -13,6 +14,7 @@ import { NotificationsScheduler } from './notifications.scheduler';
     UsersModule,
     PushModule,
     AppCacheModule,
+    BookmarksModule,
   ],
   providers: [NotificationsService, NotificationsScheduler],
 })
