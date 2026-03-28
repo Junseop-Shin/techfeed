@@ -60,6 +60,8 @@ export class JobCrawler extends BaseCrawler {
     return jobs.map((job) => ({
       type: 'job' as const,
       title: `${job.position} — ${job.company.name}`,
+      company_name: job.company.name,
+      position: job.position,
       url: `${WANTED_BASE_URL}/wd/${job.id}`,
       summary: job.address?.location ?? undefined,
       tags: [...source.tags],
