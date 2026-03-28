@@ -13,6 +13,7 @@ import { EventsModule } from './events/events.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { CommentsModule } from './comments/comments.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CommentsModule } from './comments/comments.module';
     EventsModule,
     MetricsModule,
     CommentsModule,
+    TagsModule,
   ],
 })
 export class AppModule implements NestModule {
