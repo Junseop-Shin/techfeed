@@ -26,7 +26,7 @@ export class User {
   google_id: string;
 
   @Column({ nullable: true })
-  fcm_token: string;
+  fcm_token: string | null;
 
   @CreateDateColumn()
   created_at: Date;
