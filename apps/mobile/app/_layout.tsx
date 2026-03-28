@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
@@ -49,11 +50,26 @@ async function registerForPushNotifications(): Promise<void> {
 
 function RootLayout() {
   const restoreToken = useAuthStore((s) => s.restoreToken);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const pushEnabled = useAuthStore((s) => s.pushEnabled);
 
   useEffect(() => {
     restoreToken();
-    registerForPushNotifications();
   }, [restoreToken]);
+
+  useEffect(() => {
+    if (!isLoading && pushEnabled) {
+      registerForPushNotifications();
+    }
+  }, [isLoading, pushEnabled]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

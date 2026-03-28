@@ -5,19 +5,30 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Switch,
   StyleSheet,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TagChip } from '../../src/components/TagChip';
 import { useAuthStore } from '../../src/store/auth.store';
-import { getProfile, updateTags } from '../../src/api/users';
+import { getProfile, updateTags, subscribePush, removePushToken } from '../../src/api/users';
+
+async function getAndRegisterPushToken(): Promise<string | null> {
+  if (!Device.isDevice) return null;
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') return null;
+  const tokenData = await Notifications.getExpoPushTokenAsync();
+  return tokenData.data;
+}
 
 export default function SettingsScreen() {
-  const { token, user, logout } = useAuthStore();
+  const { token, user, logout, pushEnabled, setPushEnabled } = useAuthStore();
   const queryClient = useQueryClient();
   const [newTag, setNewTag] = useState('');
 
@@ -60,6 +71,25 @@ export default function SettingsScreen() {
 
   const handleSaveTags = () => {
     saveTags(tags);
+  };
+
+  const handleTogglePush = async (enabled: boolean) => {
+    try {
+      if (!enabled) {
+        await removePushToken();
+      } else {
+        const pushToken = await getAndRegisterPushToken();
+        if (pushToken) {
+          await subscribePush(pushToken);
+        } else {
+          Alert.alert('알림 권한', '설정 앱에서 알림 권한을 허용해주세요.');
+          return;
+        }
+      }
+      await setPushEnabled(enabled);
+    } catch {
+      Alert.alert('오류', '알림 설정 변경에 실패했습니다.');
+    }
   };
 
   const handleLogout = () => {
@@ -109,10 +139,12 @@ export default function SettingsScreen() {
         <Text style={styles.headerTitle}>설정</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
+
+        {/* 계정 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>계정</Text>
           <View style={styles.profileCard}>
-            <Text style={styles.profileName}>{user?.name ?? profile?.name}</Text>
+            <Text style={styles.profileName}>{user?.name || profile?.name || '이름 없음'}</Text>
             <Text style={styles.profileEmail}>{user?.email ?? profile?.email}</Text>
           </View>
           <TouchableOpacity
@@ -124,6 +156,24 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 알림 설정 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>알림 설정</Text>
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingTitle}>푸시 알림</Text>
+              <Text style={styles.settingDescription}>새 콘텐츠 알림을 받습니다</Text>
+            </View>
+            <Switch
+              value={pushEnabled}
+              onValueChange={handleTogglePush}
+              trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
+              thumbColor={pushEnabled ? '#2563EB' : '#F3F4F6'}
+            />
+          </View>
+        </View>
+
+        {/* 구독 태그 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>구독 태그</Text>
           <Text style={styles.sectionDescription}>
@@ -237,6 +287,22 @@ const styles = StyleSheet.create({
   profileEmail: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  settingTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  settingDescription: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   tagList: {
     flexDirection: 'row',
