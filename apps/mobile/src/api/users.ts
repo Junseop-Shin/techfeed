@@ -4,7 +4,7 @@ import type { Content } from './contents';
 export interface UserProfile {
   id: string;
   email: string;
-  name: string;
+  name: string | null;
   tags: string[];
 }
 
@@ -25,3 +25,6 @@ export const updateTags = (tags: string[]): Promise<UserProfile> =>
 
 export const subscribePush = (token: string): Promise<void> =>
   apiClient.post('/push/subscribe', { token }).then((r) => r.data);
+
+export const removePushToken = (): Promise<void> =>
+  apiClient.delete('/users/me/fcm-token').then((r) => r.data);

@@ -8,11 +8,11 @@ export interface LoginRequest {
 export interface SignupRequest {
   email: string;
   password: string;
-  name: string;
+  name?: string;
 }
 
 export interface AuthResponse {
-  token: string;
+  access_token: string;
   user: {
     id: string;
     email: string;
@@ -25,3 +25,6 @@ export const login = (data: LoginRequest): Promise<AuthResponse> =>
 
 export const signup = (data: SignupRequest): Promise<AuthResponse> =>
   apiClient.post('/auth/signup', data).then((r) => r.data);
+
+export const googleLogin = (accessToken: string): Promise<AuthResponse> =>
+  apiClient.post('/auth/google', { access_token: accessToken }).then((r) => r.data);

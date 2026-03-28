@@ -60,4 +60,14 @@ export class ContentsController {
   async findOne(@Param('id') id: string) {
     return this.contentsService.findById(id);
   }
+
+  /**
+   * GET /contents/:id/summary
+   * Returns AI-generated summary for YouTube content.
+   * Result is cached in Redis (7 days) and persisted in MongoDB.
+   */
+  @Get(':id/summary')
+  async getSummary(@Param('id') id: string) {
+    return this.contentsService.getSummary(id);
+  }
 }
