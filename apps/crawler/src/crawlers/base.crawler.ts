@@ -16,6 +16,8 @@ export interface RawContent {
   tags: string[];
   source_name: string;
   published_at: Date;
+  company_name?: string;
+  position?: string;
 }
 
 export abstract class BaseCrawler {
@@ -54,6 +56,21 @@ export abstract class BaseCrawler {
     const existing = await ContentModel.findOne({ url_hash }).lean();
     if (existing) return;
 
+    // Cross-platform job dedup by company + position
+    let position_hash: string | undefined;
+    if (raw.type === 'job' && raw.company_name && raw.position) {
+      position_hash = hashUrl(
+        raw.company_name.trim().toLowerCase() + '|' + raw.position.trim().toLowerCase(),
+      );
+      const dupJob = await ContentModel.findOne({ position_hash }).lean();
+      if (dupJob) {
+        console.log(
+          `[${this.constructor.name}] Duplicate job skipped: ${raw.company_name} - ${raw.position}`,
+        );
+        return;
+      }
+    }
+
     const keywordTags = this.extractKeywordTags(raw.title, raw.summary);
     const tags = Array.from(new Set([...raw.tags, ...keywordTags]));
 
@@ -62,6 +79,7 @@ export abstract class BaseCrawler {
       url_hash,
       tags,
       es_indexed: false,
+      ...(position_hash !== undefined && { position_hash }),
     };
 
     const saved = await ContentModel.create(doc);
