@@ -1,14 +1,19 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { BookmarksService } from './bookmarks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AddBookmarkDto } from './add-bookmark.dto';
+import { UpdateBookmarkStatusDto } from './update-bookmark-status.dto';
 
 @Controller('users/me/bookmarks')
 @UseGuards(JwtAuthGuard)
@@ -16,16 +21,30 @@ export class BookmarksController {
   constructor(private readonly bookmarksService: BookmarksService) {}
 
   @Get()
-  async findAll(@Request() req: { user: { userId: string } }) {
-    return this.bookmarksService.findByUserId(req.user.userId);
+  async findAll(
+    @Request() req: { user: { userId: string } },
+    @Query('content_type') contentType?: string,
+  ) {
+    return this.bookmarksService.findByUserId(req.user.userId, contentType);
   }
 
   @Post(':contentId')
   async add(
     @Request() req: { user: { userId: string } },
     @Param('contentId') contentId: string,
+    @Body() body: AddBookmarkDto,
   ) {
-    await this.bookmarksService.add(req.user.userId, contentId);
+    await this.bookmarksService.add(req.user.userId, contentId, body.content_type);
+    return { success: true };
+  }
+
+  @Patch(':contentId/status')
+  async updateStatus(
+    @Request() req: { user: { userId: string } },
+    @Param('contentId') contentId: string,
+    @Body() body: UpdateBookmarkStatusDto,
+  ) {
+    await this.bookmarksService.updateStatus(req.user.userId, contentId, body.status);
     return { success: true };
   }
 

@@ -24,6 +24,8 @@ export interface Content {
   // job specific
   company_name?: string;
   position?: string;
+  // shared optional
+  summary?: string;
 }
 
 export interface ContentsResponse {
