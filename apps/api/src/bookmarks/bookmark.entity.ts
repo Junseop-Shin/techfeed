@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   Unique,
@@ -15,10 +16,17 @@ export class Bookmark {
   id: number;
 
   @ManyToOne(() => User, (u) => u.bookmarks, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column()
   content_id: string;
+
+  @Column({ nullable: true })
+  content_type: string | null;
+
+  @Column({ nullable: true })
+  status: string | null;
 
   @CreateDateColumn()
   created_at: Date;
