@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   Switch,
   StyleSheet,
@@ -15,7 +14,6 @@ import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { TagChip } from '../../src/components/TagChip';
 import { AuthBenefitsSheet } from '../../src/components/AuthBenefitsSheet';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useThemeStore } from '../../src/store/theme.store';
@@ -29,6 +27,13 @@ import {
   updateUserPreferences,
 } from '../../src/api/users';
 
+const PREDEFINED_TAGS = [
+  'react', 'typescript', 'nextjs', 'javascript',
+  'python', 'java', 'kotlin', 'golang', 'rust', 'swift',
+  'aws', 'devops', 'kubernetes', 'docker',
+  'ai', 'database', 'msa',
+];
+
 async function getAndRegisterPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
   const { status } = await Notifications.requestPermissionsAsync();
@@ -41,7 +46,6 @@ export default function SettingsScreen() {
   const { token, user, logout, pushEnabled, setPushEnabled } = useAuthStore();
   const { theme, setTheme, colors } = useThemeStore();
   const queryClient = useQueryClient();
-  const [newTag, setNewTag] = useState('');
   const [benefitsVisible, setBenefitsVisible] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
@@ -100,21 +104,13 @@ export default function SettingsScreen() {
     },
   });
 
-  const handleAddTag = () => {
-    const trimmed = newTag.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed]);
-    }
-    setNewTag('');
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
-  };
-
   const handleSaveTags = () => {
     saveTags(tags);
   };
+
+  const togglePredefinedTag = useCallback((tag: string) => {
+    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  }, []);
 
   const handleTogglePush = async (enabled: boolean) => {
     try {
@@ -228,28 +224,27 @@ export default function SettingsScreen() {
       flexWrap: 'wrap' as const,
       marginBottom: 12,
     },
-    addTagRow: {
+    predefinedTagList: {
       flexDirection: 'row' as const,
-      gap: 8,
-      marginBottom: 12,
+      flexWrap: 'wrap' as const,
+      marginBottom: 16,
     },
-    tagInput: {
-      flex: 1,
-      backgroundColor: colors.searchBg,
-      borderRadius: 8,
+    predefinedChip: {
       paddingHorizontal: 12,
-      paddingVertical: 10,
-      fontSize: 14,
-      color: colors.textPrimary,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: colors.searchBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 8,
+      marginBottom: 8,
     },
-    addButton: {
+    predefinedChipActive: {
       backgroundColor: colors.primaryDim,
-      borderRadius: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      justifyContent: 'center' as const,
+      borderColor: colors.primary,
     },
-    addButtonText: { fontSize: 14, fontWeight: '600' as const, color: colors.primary },
+    predefinedChipText: { fontSize: 13, fontWeight: '500' as const, color: colors.textSecondary },
+    predefinedChipTextActive: { color: colors.primary, fontWeight: '600' as const },
     center: {
       flex: 1,
       alignItems: 'center' as const,
@@ -528,37 +523,24 @@ export default function SettingsScreen() {
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
           ) : (
             <>
-              <View style={styles.tagList}>
-                {tags.map((tag) => (
-                  <TagChip
-                    key={tag}
-                    label={tag}
-                    selected={true}
-                    onPress={() => handleRemoveTag(tag)}
-                  />
-                ))}
-              </View>
-              <View style={styles.addTagRow}>
-                <TextInput
-                  style={styles.tagInput}
-                  value={newTag}
-                  onChangeText={setNewTag}
-                  placeholder="태그 추가..."
-                  placeholderTextColor={colors.textSecondary}
-                  onSubmitEditing={handleAddTag}
-                  returnKeyType="done"
-                  accessibilityLabel="태그 입력"
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={handleAddTag}
-                  accessibilityRole="button"
-                  accessibilityLabel="태그 추가"
-                >
-                  <Text style={styles.addButtonText}>추가</Text>
-                </TouchableOpacity>
+              <View style={styles.predefinedTagList}>
+                {PREDEFINED_TAGS.map((tag) => {
+                  const active = tags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[styles.predefinedChip, active && styles.predefinedChipActive]}
+                      onPress={() => togglePredefinedTag(tag)}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={tag}
+                      accessibilityState={{ checked: active }}
+                    >
+                      <Text style={[styles.predefinedChipText, active && styles.predefinedChipTextActive]}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               <TouchableOpacity
                 style={[styles.primaryButton, isSaving && styles.buttonDisabled]}

@@ -81,10 +81,6 @@ export class ContentsService {
     const content = await this.contentModel.findById(id).lean().exec();
     if (!content) throw new NotFoundException(`Content ${id} not found`);
 
-    if (content.type !== 'youtube') {
-      throw new BadRequestException('Summary is only available for YouTube content');
-    }
-
     if (content.ai_summary) {
       await this.cacheService.set(cacheKey, content.ai_summary, SUMMARY_CACHE_TTL);
       return { summary: content.ai_summary };
@@ -96,11 +92,15 @@ export class ContentsService {
     }
 
     const model = this.gemini.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `다음 YouTube 영상을 한국어로 3~5문장으로 간결하게 요약해줘.
+    const contentBody = (content as any).content_body ?? content.summary ?? '';
+    const contentTypeLabel =
+      content.type === 'youtube' ? 'YouTube 영상' : content.type === 'blog' ? '블로그 포스트' : '채용공고';
+
+    const prompt = `다음 ${contentTypeLabel}을 한국어로 3~5문장으로 간결하게 요약해줘.
 제목: ${content.title}
-채널: ${content.source_name}
+출처: ${content.source_name}
 URL: ${content.url}
-${content.summary ? `설명: ${content.summary}` : ''}
+${contentBody ? `내용: ${contentBody.slice(0, 3000)}` : ''}
 핵심 내용만 요약하고, 번호나 불릿 없이 자연스러운 문장으로 작성해줘.`;
 
     const result = await model.generateContent(prompt);
