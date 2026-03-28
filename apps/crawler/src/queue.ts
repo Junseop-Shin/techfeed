@@ -5,8 +5,6 @@ import { BlogCrawler } from './crawlers/blog.crawler';
 import { YouTubeCrawler } from './crawlers/youtube.crawler';
 import { JobCrawler } from './crawlers/job.crawler';
 import { JumpitCrawler } from './crawlers/jumpit.crawler';
-import { ProgrammersCrawler } from './crawlers/programmers.crawler';
-import { RememberCrawler } from './crawlers/remember.crawler';
 
 const QUEUE_NAME = 'crawl';
 const CRAWL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
@@ -35,16 +33,12 @@ export async function startQueue(): Promise<void> {
       const youtube = new YouTubeCrawler(esClient, redis);
       const jobs = new JobCrawler(esClient, redis);
       const jumpit = new JumpitCrawler(esClient, redis);
-      const programmers = new ProgrammersCrawler(esClient, redis);
-      const remember = new RememberCrawler(esClient, redis);
 
       await Promise.allSettled([
         blog.run(),
         youtube.run(),
         jobs.run(),
         jumpit.run(),
-        programmers.run(),
-        remember.run(),
       ]);
 
       console.log('[Queue] Crawl cycle complete');
