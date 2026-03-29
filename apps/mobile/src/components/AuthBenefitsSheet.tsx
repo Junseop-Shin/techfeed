@@ -24,14 +24,19 @@ interface Benefit {
 
 const BENEFITS: Benefit[] = [
   {
+    icon: '🤖',
+    title: 'AI 요약 확대',
+    description: '블로그 하루 10회 · 영상/채용 하루 3회 (비로그인 대비 3~10배)',
+  },
+  {
+    icon: '🔖',
+    title: '북마크 확대',
+    description: '블로그 50개 · 영상 30개 · 채용공고 30개 저장 가능',
+  },
+  {
     icon: '📊',
     title: '맞춤 추천 피드',
     description: '관심 주제/채널 기반 콘텐츠 큐레이션',
-  },
-  {
-    icon: '📈',
-    title: '독서 통계',
-    description: '주간 읽은 수, 관심 태그 분포, 연속 읽기 스트릭',
   },
   {
     icon: '🔔',
