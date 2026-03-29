@@ -16,6 +16,13 @@ const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
 const RATE_LIMIT_TTL = 60 * 60 * 24; // 24시간
 const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
+// 콘텐츠 타입별 일일 AI 요약 한도 (비로그인, 로그인)
+const SUMMARY_LIMITS: Record<string, { anonymous: number; user: number }> = {
+  blog:    { anonymous: 3, user: 10 },
+  youtube: { anonymous: 1, user: 3  },
+  job:     { anonymous: 1, user: 3  },
+};
+
 @Injectable()
 export class ContentsService implements OnModuleInit {
   private readonly gemini: GoogleGenerativeAI | null;
@@ -179,31 +186,33 @@ export class ContentsService implements OnModuleInit {
     const cached = await this.cacheService.get(cacheKey);
     if (cached) return { summary: cached };
 
-    // 2. Rate limit 체크
-    const isPremium = user ? PREMIUM_EMAILS.has(user.email) : false;
-    if (!isPremium) {
-      const rateLimitKey = user
-        ? `ratelimit:summary:user:${user.userId}`
-        : `ratelimit:summary:ip:${ip}`;
-      const limit = user ? 20 : 5;
-      const count = await this.cacheService.getRateLimitCount(rateLimitKey);
-      if (count >= limit) {
-        throw new ForbiddenException(
-          user
-            ? `일일 AI 요약 한도(${limit}회)에 도달했습니다. 내일 다시 시도해주세요.`
-            : `비로그인 일일 AI 요약 한도(${limit}회)에 도달했습니다. 로그인하면 더 많이 사용할 수 있습니다.`,
-        );
-      }
-      await this.cacheService.incrementRateLimit(rateLimitKey, RATE_LIMIT_TTL);
-    }
-
-    // 3. MongoDB의 기존 ai_summary 확인
+    // 2. MongoDB 조회 — ai_summary 존재 시 Redis 복구 후 반환 (한도 차감 없음)
     const content = await this.contentModel.findById(id).lean().exec();
     if (!content) throw new NotFoundException(`Content ${id} not found`);
 
     if (content.ai_summary) {
       await this.cacheService.set(cacheKey, content.ai_summary, SUMMARY_CACHE_TTL);
       return { summary: content.ai_summary };
+    }
+
+    // 3. Rate limit 체크 (신규 Gemini 호출 전에만 적용)
+    const isPremium = user ? PREMIUM_EMAILS.has(user.email) : false;
+    if (!isPremium) {
+      const contentType = content.type ?? 'blog';
+      const limits = SUMMARY_LIMITS[contentType] ?? SUMMARY_LIMITS['blog'];
+      const limit = user ? limits.user : limits.anonymous;
+      const rateLimitKey = user
+        ? `ratelimit:summary:${contentType}:user:${user.userId}`
+        : `ratelimit:summary:${contentType}:ip:${ip}`;
+      const count = await this.cacheService.getRateLimitCount(rateLimitKey);
+      if (count >= limit) {
+        throw new ForbiddenException(
+          user
+            ? `일일 ${contentType === 'youtube' ? '영상' : '글'} AI 요약 한도(${limit}회)에 도달했습니다. 내일 다시 시도해주세요.`
+            : `비로그인 일일 ${contentType === 'youtube' ? '영상' : '글'} AI 요약 한도(${limit}회)에 도달했습니다. 로그인하면 더 많이 사용할 수 있습니다.`,
+        );
+      }
+      await this.cacheService.incrementRateLimit(rateLimitKey, RATE_LIMIT_TTL);
     }
 
     // 4. Gemini API 호출

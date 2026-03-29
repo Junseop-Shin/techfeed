@@ -17,7 +17,11 @@ const DEFAULT_STATUS: Record<string, string> = {
   job: 'interested',
 };
 
-const BOOKMARK_LIMIT = 50;
+const BOOKMARK_LIMITS: Record<string, number> = {
+  blog:    50,
+  youtube: 30,
+  job:     30,
+};
 const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
 @Injectable()
@@ -68,12 +72,14 @@ export class BookmarksService {
 
   async add(userId: string, email: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
     if (!PREMIUM_EMAILS.has(email) && contentType) {
+      const limit = BOOKMARK_LIMITS[contentType] ?? 30;
       const count = await this.repo.count({
         where: { user: { id: userId }, content_type: contentType },
       });
-      if (count >= BOOKMARK_LIMIT) {
+      if (count >= limit) {
+        const typeLabel = contentType === 'blog' ? '블로그' : contentType === 'youtube' ? '영상' : '채용공고';
         throw new ForbiddenException(
-          `${contentType} 북마크 한도(${BOOKMARK_LIMIT}개)에 도달했습니다. 프리미엄으로 업그레이드하면 무제한으로 저장할 수 있습니다.`,
+          `${typeLabel} 북마크 한도(${limit}개)에 도달했습니다. 프리미엄으로 업그레이드하면 무제한으로 저장할 수 있습니다.`,
         );
       }
     }
