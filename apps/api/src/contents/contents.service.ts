@@ -51,7 +51,13 @@ export class ContentsService {
     }
 
     if (opts.sort === 'views') {
-      result.items.sort((a: any, b: any) => (b.view_count ?? 0) - (a.view_count ?? 0));
+      const ids = result.items.map((i: any) => i.id as string);
+      const docs = await this.contentModel
+        .find({ _id: { $in: ids } }, { view_count: 1 })
+        .lean()
+        .exec();
+      const viewMap = new Map(docs.map((d) => [String(d._id), d.view_count ?? 0]));
+      result.items.sort((a: any, b: any) => (viewMap.get(b.id) ?? 0) - (viewMap.get(a.id) ?? 0));
       return result;
     }
 
@@ -112,7 +118,10 @@ export class ContentsService {
   }
 
   async findById(id: string) {
-    const content = await this.contentModel.findById(id).lean().exec();
+    const content = await this.contentModel
+      .findByIdAndUpdate(id, { $inc: { view_count: 1 } }, { new: true })
+      .lean()
+      .exec();
     if (!content) {
       throw new NotFoundException(`Content ${id} not found`);
     }

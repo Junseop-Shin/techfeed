@@ -42,7 +42,7 @@ export const updateTags = (tags: string[]): Promise<UserProfile> =>
   apiClient.put('/users/me/tags', { tags }).then((r) => r.data);
 
 export const subscribePush = (token: string): Promise<void> =>
-  apiClient.post('/push/subscribe', { token }).then((r) => r.data);
+  apiClient.post('/push/subscribe', { fcm_token: token }).then((r) => r.data);
 
 export const removePushToken = (): Promise<void> =>
   apiClient.delete('/users/me/fcm-token').then((r) => r.data);

@@ -90,6 +90,7 @@ export class SearchService implements OnModuleInit {
         multi_match: {
           query: q,
           fields: ['title', 'summary'],
+          type: 'phrase_prefix',
         },
       });
     }

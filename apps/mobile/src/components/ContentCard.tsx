@@ -157,6 +157,9 @@ function BlogCard({ content }: { content: Content }) {
         <View style={styles.meta}>
           {content.author && <Text style={styles.metaText}>{content.author} · </Text>}
           <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
+          {(content as any).view_count > 0 && (
+            <Text style={styles.metaText}> · 조회 {(content as any).view_count}</Text>
+          )}
         </View>
         {content.tags.length > 0 && (
           <View style={styles.tagRow}>
@@ -233,6 +236,9 @@ function YoutubeCard({ content }: { content: Content }) {
         <Image source={{ uri: content.thumbnail_url }} style={styles.thumbnail} accessibilityLabel={`Thumbnail for ${content.title}`} />
       )}
       <Text style={styles.title} numberOfLines={2}>{content.title}</Text>
+      {(content as any).view_count > 0 && (
+        <Text style={{ fontSize: 12, color: colors.textTertiary, marginBottom: 4 }}>조회 {(content as any).view_count}</Text>
+      )}
       <TouchableOpacity
         style={styles.summaryToggle}
         onPress={() => setShowSummary((v) => !v)}
@@ -291,7 +297,12 @@ function JobCard({ content }: { content: Content }) {
           ))}
         </View>
       )}
-      <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
+      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+        <Text style={styles.metaText}>{formatDate(content.published_at)}</Text>
+        {(content as any).view_count > 0 && (
+          <Text style={styles.metaText}> · 조회 {(content as any).view_count}</Text>
+        )}
+      </View>
     </View>
   );
 }

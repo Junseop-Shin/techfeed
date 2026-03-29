@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectModel } from '@nestjs/mongoose';
 import { Repository } from 'typeorm';
+import { Model, Types } from 'mongoose';
 import { Bookmark } from './bookmark.entity';
+import { Content, ContentDocument } from '../contents/content.schema';
 
 interface JobBookmarkForAlert {
   content_id: string;
@@ -19,16 +22,37 @@ export class BookmarksService {
   constructor(
     @InjectRepository(Bookmark)
     private readonly repo: Repository<Bookmark>,
+    @InjectModel(Content.name)
+    private readonly contentModel: Model<ContentDocument>,
   ) {}
 
-  async findByUserId(userId: string, contentType?: string): Promise<Bookmark[]> {
-    return this.repo.find({
+  async findByUserId(userId: string, contentType?: string): Promise<(Bookmark & { content: any })[]> {
+    const bookmarks = await this.repo.find({
       where: {
         user: { id: userId },
         ...(contentType ? { content_type: contentType } : {}),
       },
       order: { created_at: 'DESC' },
     });
+
+    if (bookmarks.length === 0) return [];
+
+    // Enrich with content from MongoDB
+    const validIds = bookmarks
+      .map((b) => b.content_id)
+      .filter((id) => Types.ObjectId.isValid(id));
+
+    const contents = await this.contentModel
+      .find({ _id: { $in: validIds } })
+      .lean()
+      .exec();
+
+    const contentMap = new Map(contents.map((c) => [String(c._id), c]));
+
+    return bookmarks.map((b) => ({
+      ...b,
+      content: contentMap.get(b.content_id) ?? null,
+    }));
   }
 
   async add(userId: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
@@ -64,7 +88,6 @@ export class BookmarksService {
   }
 
   async findJobBookmarksForAlert(): Promise<JobBookmarkForAlert[]> {
-    // status가 NULL이거나 '탈락'/'최종합격'이 아닌 job 북마크 조회
     const bookmarks = await this.repo
       .createQueryBuilder('bookmark')
       .leftJoinAndSelect('bookmark.user', 'user')

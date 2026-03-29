@@ -42,6 +42,9 @@ export class Content {
   @Prop({ default: 0 })
   like_count: number;
 
+  @Prop({ default: 0 })
+  view_count: number;
+
   @Prop({ default: false })
   es_indexed: boolean;
 

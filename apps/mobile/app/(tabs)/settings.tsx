@@ -717,7 +717,7 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>앱 리뷰</Text>
             <Text style={styles.sectionDescription}>
-              techfeed를 사용해보셨나요? 솔직한 의견을 남겨주세요.
+              TechFeed를 사용해보셨나요? 솔직한 의견을 남겨주세요.
             </Text>
             {reviewSent ? (
               <Text style={styles.reviewSentText}>리뷰를 남겨주셔서 감사합니다!</Text>

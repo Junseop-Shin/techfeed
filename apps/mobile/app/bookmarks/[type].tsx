@@ -164,10 +164,10 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkI
   return (
     <TouchableOpacity
       style={{ position: 'relative' }}
+      onPress={() => router.push(`/content/${item.content_id}`)}
       onLongPress={handleLongPress}
       accessibilityRole="button"
-      accessibilityLabel="북마크 아이템, 길게 눌러 상태 변경"
-      accessibilityHint="길게 누르면 상태를 변경할 수 있습니다"
+      accessibilityLabel="북마크 아이템, 탭하면 상세보기, 길게 눌러 상태 변경"
     >
       {item.content ? (
         <ContentCard content={item.content} />

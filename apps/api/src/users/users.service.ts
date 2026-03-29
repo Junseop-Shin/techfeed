@@ -111,7 +111,7 @@ export class UsersService {
        FROM user_events
        WHERE user_id = $1
          AND event_type = 'read'
-         AND created_at >= NOW() - INTERVAL '7 days'`,
+         AND time >= NOW() - INTERVAL '7 days'`,
       [userId],
     );
     const week_reads = parseInt(weekReadsResult[0]?.count ?? '0', 10);
@@ -132,7 +132,7 @@ export class UsersService {
        FROM user_events
        WHERE user_id = $1
          AND event_type = 'read'
-         AND created_at >= NOW() - INTERVAL '30 days'
+         AND time >= NOW() - INTERVAL '30 days'
          AND tag IS NOT NULL
        GROUP BY tag
        ORDER BY count DESC
@@ -151,7 +151,7 @@ export class UsersService {
 
     // streak_days: 오늘부터 역산하여 연속 read 일수
     const streakRows = await this.dataSource.query<{ day: string }[]>(
-      `SELECT DISTINCT DATE(created_at) AS day
+      `SELECT DISTINCT DATE(time) AS day
        FROM user_events
        WHERE user_id = $1
          AND event_type = 'read'

@@ -76,7 +76,7 @@ export default function ContentDetailScreen() {
   const handleShare = useCallback(async () => {
     if (!content) return;
     try {
-      await Share.share({ message: content.title, url: content.url });
+      await Share.share({ message: content.url, url: content.url });
       // Auto-bookmark as '공유함' after sharing
       if (token && id) {
         if (isBookmarked) {
@@ -97,14 +97,21 @@ export default function ContentDetailScreen() {
 
   const handleLike = useCallback(async () => {
     if (!token || !id) return;
+    // Optimistic update — reflect immediately
+    const newLiked = !isLiked;
+    setIsLiked(newLiked);
+    setLikeCount((prev) => (prev ?? 0) + (newLiked ? 1 : -1));
     try {
       const result = await toggleLike(id);
       setIsLiked(result.liked);
       setLikeCount(result.like_count);
     } catch {
+      // Revert on failure
+      setIsLiked(!newLiked);
+      setLikeCount((prev) => (prev ?? 0) + (newLiked ? -1 : 1));
       Alert.alert('오류', '좋아요 처리에 실패했습니다.');
     }
-  }, [token, id]);
+  }, [token, id, isLiked]);
 
   const handleOpenExternal = useCallback(() => {
     if (content?.url) {

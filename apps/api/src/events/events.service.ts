@@ -51,6 +51,7 @@ export class EventsService implements OnModuleInit {
       service_id: 'techfeed',
       user_id: userId ?? null,
       metadata: {
+        ...(e.metadata ?? {}),
         content_id: e.content_id,
         tag: e.tag,
         duration_ms: e.duration_ms,
@@ -153,3 +154,4 @@ export class EventsService implements OnModuleInit {
     return parseInt(rows[0]?.count ?? '0', 10);
   }
 }
+
