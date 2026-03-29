@@ -67,7 +67,7 @@ export default function ContentDetailScreen() {
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
         .catch(() => Alert.alert('오류', '북마크 취소에 실패했습니다.'));
     } else {
-      addBookmarkWithType(id, content.source_type, 'done')
+      addBookmarkWithType(id, (content as any).source_type ?? (content as any).type, 'done')
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
         .catch(() => Alert.alert('오류', '북마크 저장에 실패했습니다.'));
     }
@@ -84,7 +84,7 @@ export default function ContentDetailScreen() {
             .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
             .catch(() => {});
         } else {
-          addBookmarkWithType(id, content.source_type, 'shared')
+          addBookmarkWithType(id, (content as any).source_type ?? (content as any).type, 'shared')
             .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
             .catch(() => {});
         }
