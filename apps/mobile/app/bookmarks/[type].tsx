@@ -17,51 +17,7 @@ import { useAuthStore } from '../../src/store/auth.store';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useBookmarksByType, useUpdateBookmarkStatus } from '../../src/hooks/useBookmark';
 import type { BookmarkItem } from '../../src/api/users';
-
-type ContentWithDeadline = { deadline?: string } & Record<string, unknown>;
-
-function getDDayLabel(deadline: string): { label: string; color: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const end = new Date(deadline);
-  end.setHours(0, 0, 0, 0);
-  const diff = Math.round((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diff < 0) return { label: '마감', color: '#9CA3AF' };
-  if (diff === 0) return { label: 'D-Day', color: '#EF4444' };
-  if (diff <= 3) return { label: `D-${diff}`, color: '#EF4444' };
-  if (diff <= 7) return { label: `D-${diff}`, color: '#F97316' };
-  return { label: `D-${diff}`, color: '#6B7280' };
-}
-
-function DDayBadge({ deadline }: { deadline: string }) {
-  const { label, color } = getDDayLabel(deadline);
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        badge: {
-          borderRadius: 4,
-          paddingHorizontal: 7,
-          paddingVertical: 3,
-          borderWidth: 1,
-          borderColor: color,
-          alignSelf: 'flex-start' as const,
-        },
-        text: {
-          fontSize: 11,
-          fontWeight: '700' as const,
-          color,
-        },
-      }),
-    [color]
-  );
-
-  return (
-    <View style={styles.badge}>
-      <Text style={styles.text}>{label}</Text>
-    </View>
-  );
-}
+import type { ColorTokens } from '../../src/store/theme.store';
 
 type ContentTypeParam = 'blog' | 'youtube' | 'jobs';
 
@@ -88,14 +44,6 @@ const CONTENT_STATUS_TABS: StatusTab[] = [
   { value: 'shared', label: '공유함' },
 ];
 
-const JOB_STATUS_TABS: StatusTab[] = [
-  { value: 'interested', label: '관심' },
-  { value: 'to_apply', label: '지원예정' },
-  { value: 'applied', label: '지원완료' },
-  { value: 'interviewing', label: '면접중' },
-  { value: 'accepted', label: '최종합격' },
-  { value: 'rejected', label: '탈락' },
-];
 
 function isValidType(type: string): type is ContentTypeParam {
   return type === 'blog' || type === 'youtube' || type === 'jobs';
@@ -105,32 +53,11 @@ interface BookmarkItemRowProps {
   item: BookmarkItem;
   statusTabs: StatusTab[];
   onStatusChange: (contentId: string, status: string) => void;
-  colors: ReturnType<typeof useThemeStore>['colors'] extends infer C ? C : never;
+  colors: ColorTokens;
 }
 
 function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkItemRowProps) {
   const styles = useMemo(() => StyleSheet.create({
-    statusBadgeWrapper: {
-      position: 'absolute' as const,
-      top: 14,
-      right: 28,
-      flexDirection: 'column' as const,
-      alignItems: 'flex-end' as const,
-      gap: 4,
-    },
-    statusBadge: {
-      backgroundColor: colors.primaryDim,
-      borderRadius: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderWidth: 1,
-      borderColor: colors.primary,
-    },
-    statusBadgeText: {
-      fontSize: 11,
-      fontWeight: '600' as const,
-      color: colors.primary,
-    },
     fallbackRow: {
       marginHorizontal: 16,
       marginVertical: 6,
@@ -156,22 +83,14 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkI
     );
   };
 
-  const currentStatus = statusTabs.find((t) => t.value === item.status);
-  const deadline = item.content
-    ? (item.content as unknown as ContentWithDeadline).deadline
-    : undefined;
-  const isJobType = item.content_type === 'job';
-
   return (
     <TouchableOpacity
-      style={{ position: 'relative' }}
-      onPress={() => router.push(`/content/${item.content_id}`)}
       onLongPress={handleLongPress}
       accessibilityRole="button"
-      accessibilityLabel="북마크 아이템, 탭하면 상세보기, 길게 눌러 상태 변경"
+      accessibilityLabel="북마크 아이템, 길게 눌러 상태 변경"
     >
       {item.content ? (
-        <ContentCard content={item.content} bookmarkStatus={item.status} />
+        <ContentCard content={item.content} jobStatus={item.job_status} />
       ) : (
         <View style={styles.fallbackRow}>
           <Text style={styles.fallbackId} numberOfLines={1}>
@@ -179,14 +98,6 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkI
           </Text>
         </View>
       )}
-      <View style={styles.statusBadgeWrapper}>
-        {isJobType && deadline && <DDayBadge deadline={deadline} />}
-        {currentStatus && (
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusBadgeText}>{currentStatus.label}</Text>
-          </View>
-        )}
-      </View>
     </TouchableOpacity>
   );
 }
@@ -198,7 +109,7 @@ export default function BookmarksTypeScreen() {
 
   const validType = isValidType(type ?? '') ? (type as ContentTypeParam) : 'blog';
   const contentType = CONTENT_TYPE_MAP[validType];
-  const statusTabs = validType === 'jobs' ? JOB_STATUS_TABS : CONTENT_STATUS_TABS;
+  const statusTabs = CONTENT_STATUS_TABS;
 
   const [selectedStatus, setSelectedStatus] = useState<string>(statusTabs[0].value);
   const [isRefreshing, setIsRefreshing] = useState(false);

@@ -49,10 +49,18 @@ export class BookmarksService {
 
     const contentMap = new Map(contents.map((c) => [String(c._id), c]));
 
-    return bookmarks.map((b) => ({
-      ...b,
-      content: contentMap.get(b.content_id) ?? null,
-    }));
+    return bookmarks.map((b) => {
+      const raw = contentMap.get(b.content_id);
+      const content = raw
+        ? {
+            ...raw,
+            id: String(raw._id),
+            source_type: raw.type,
+            thumbnail_url: raw.thumbnail ?? null,
+          }
+        : null;
+      return { ...b, content };
+    });
   }
 
   async add(userId: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
@@ -80,6 +88,17 @@ export class BookmarksService {
       throw new NotFoundException('Bookmark not found');
     }
     bookmark.status = status;
+    await this.repo.save(bookmark);
+  }
+
+  async updateJobStatus(userId: string, contentId: string, jobStatus: string): Promise<void> {
+    const bookmark = await this.repo.findOne({
+      where: { user: { id: userId }, content_id: contentId },
+    });
+    if (!bookmark) {
+      throw new NotFoundException('Bookmark not found');
+    }
+    bookmark.job_status = jobStatus;
     await this.repo.save(bookmark);
   }
 

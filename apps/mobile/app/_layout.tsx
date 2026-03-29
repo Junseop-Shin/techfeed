@@ -6,7 +6,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { useAuthStore } from '../src/store/auth.store';
 import { useSeenStore } from '../src/store/seen.store';
-import { subscribePush, resetBadge } from '../src/api/users';
+import { subscribePush, resetBadge, getBadge } from '../src/api/users';
 import { trackEvent } from '../src/api/analytics';
 
 const queryClient = new QueryClient({
@@ -83,8 +83,15 @@ function RootLayout() {
     // Clear badge when app comes to foreground (user opened app directly)
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        Notifications.setBadgeCountAsync(0).catch(() => {});
-        resetBadge().catch(() => {});
+        // Fetch server badge count first (so home screen icon shows correct count),
+        // then reset so it clears after the user is inside the app.
+        getBadge()
+          .then(({ count }) => Notifications.setBadgeCountAsync(count))
+          .catch(() => {})
+          .finally(() => {
+            Notifications.setBadgeCountAsync(0).catch(() => {});
+            resetBadge().catch(() => {});
+          });
       }
     });
 

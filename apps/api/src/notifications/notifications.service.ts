@@ -69,6 +69,7 @@ export class NotificationsService implements OnModuleInit {
     }
 
     const { contentId, title, tags } = event;
+    this.logger.log(`handleNewContent: contentId=${contentId} tags=${tags.join(',')}`);
 
     // Collect unique users subscribed to matching tags
     const recipientMap = new Map<string, string>(); // userId -> fcm_token
@@ -81,6 +82,7 @@ export class NotificationsService implements OnModuleInit {
       }
     }
 
+    this.logger.log(`handleNewContent: found ${recipientMap.size} recipients for content ${contentId}`);
     if (recipientMap.size === 0) return;
 
     // Send individually so each user gets their own badge count

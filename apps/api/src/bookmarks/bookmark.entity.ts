@@ -28,6 +28,9 @@ export class Bookmark {
   @Column({ type: 'varchar', nullable: true })
   status: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  job_status: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 }

@@ -48,6 +48,16 @@ export class BookmarksController {
     return { success: true };
   }
 
+  @Patch(':contentId/job-status')
+  async updateJobStatus(
+    @Request() req: { user: { userId: string } },
+    @Param('contentId') contentId: string,
+    @Body() body: UpdateBookmarkStatusDto,
+  ) {
+    await this.bookmarksService.updateJobStatus(req.user.userId, contentId, body.status);
+    return { success: true };
+  }
+
   @Delete(':contentId')
   async remove(
     @Request() req: { user: { userId: string } },

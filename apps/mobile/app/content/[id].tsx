@@ -25,7 +25,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
 import { trackEvent, toggleLike, getLikeStatus } from '../../src/api/contents';
 import { addBookmarkWithType, removeBookmark, updateBookmarkStatus } from '../../src/api/users';
-import { useBookmarks, useBookmarkStatus, useUpdateBookmarkStatus } from '../../src/hooks/useBookmark';
+import { useBookmarks, useBookmarkJobStatus, useUpdateBookmarkJobStatus } from '../../src/hooks/useBookmark';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useQueryClient } from '@tanstack/react-query';
@@ -68,8 +68,8 @@ export default function ContentDetailScreen() {
   }, [token, id]);
 
   const isBookmarked = bookmarkIds?.has(id ?? '') ?? false;
-  const { data: bookmarkStatus } = useBookmarkStatus(id ?? '');
-  const { mutate: updateJobStatus } = useUpdateBookmarkStatus();
+  const { data: bookmarkStatus } = useBookmarkJobStatus(id ?? '');
+  const { mutate: updateJobStatus } = useUpdateBookmarkJobStatus();
   const contentType = (content as any)?.source_type ?? (content as any)?.type;
   const isJob = contentType === 'job';
 

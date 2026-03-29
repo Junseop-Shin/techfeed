@@ -5,6 +5,7 @@ import {
   removeBookmark,
   getBookmarksByType,
   updateBookmarkStatus,
+  updateBookmarkJobStatus,
 } from '../api/users';
 import type { BookmarkItem } from '../api/users';
 import { useAuthStore } from '../store/auth.store';
@@ -74,6 +75,29 @@ export const useUpdateBookmarkStatus = () => {
   return useMutation({
     mutationFn: ({ contentId, status }: { contentId: string; status: string }) =>
       updateBookmarkStatus(contentId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookmarks', 'byType'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+    },
+  });
+};
+
+export const useBookmarkJobStatus = (contentId: string) => {
+  const token = useAuthStore((s) => s.token);
+  return useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: getBookmarks,
+    enabled: !!token,
+    select: (data) => data.find((c) => c.content_id === contentId)?.job_status ?? null,
+  });
+};
+
+export const useUpdateBookmarkJobStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ contentId, status }: { contentId: string; status: string }) =>
+      updateBookmarkJobStatus(contentId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookmarks', 'byType'] });
       queryClient.invalidateQueries({ queryKey: ['bookmarks'] });

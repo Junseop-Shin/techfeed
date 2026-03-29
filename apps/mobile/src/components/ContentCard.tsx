@@ -23,7 +23,7 @@ import { trackEvent } from '../api/analytics';
 interface ContentCardProps {
   content: Content;
   isNew?: boolean;
-  bookmarkStatus?: string | null;
+  jobStatus?: string | null;
 }
 
 const JOB_STATUS_COLORS: Record<string, string> = {
@@ -323,10 +323,10 @@ function JobCard({ content }: { content: Content }) {
   );
 }
 
-export function ContentCard({ content, isNew, bookmarkStatus }: ContentCardProps) {
+export function ContentCard({ content, isNew, jobStatus }: ContentCardProps) {
   const colors = useThemeStore((s) => s.colors);
   const contentType = content.source_type ?? (content as any).type;
-  const statusBorderColor = bookmarkStatus ? JOB_STATUS_COLORS[bookmarkStatus] : undefined;
+  const statusBorderColor = jobStatus ? JOB_STATUS_COLORS[jobStatus] : undefined;
 
   return (
     <TouchableOpacity

@@ -54,6 +54,12 @@ export class UsersController {
     private readonly redisProvider: RedisProvider,
   ) {}
 
+  @Get('badge')
+  async getBadge(@Request() req: { user: { userId: string } }) {
+    const val = await this.redisProvider.client.get(`badge:${req.user.userId}`);
+    return { count: val ? parseInt(val, 10) : 0 };
+  }
+
   @Post('badge/reset')
   async resetBadge(@Request() req: { user: { userId: string } }) {
     await this.redisProvider.client.set(`badge:${req.user.userId}`, 0);

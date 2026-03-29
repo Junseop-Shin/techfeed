@@ -13,6 +13,7 @@ export interface BookmarkItem {
   content_id: string;
   content_type: string | null;
   status: string | null;
+  job_status: string | null;
   created_at: string;
   content?: Content;
 }
@@ -31,6 +32,9 @@ export const addBookmarkWithType = (contentId: string, contentType: string, stat
 
 export const updateBookmarkStatus = (contentId: string, status: string): Promise<void> =>
   apiClient.patch(`/users/me/bookmarks/${contentId}/status`, { status }).then((r) => r.data);
+
+export const updateBookmarkJobStatus = (contentId: string, status: string): Promise<void> =>
+  apiClient.patch(`/users/me/bookmarks/${contentId}/job-status`, { status }).then((r) => r.data);
 
 export const getBookmarksByType = (contentType: string): Promise<BookmarkItem[]> =>
   apiClient.get('/users/me/bookmarks', { params: { content_type: contentType } }).then((r) => r.data);
@@ -70,6 +74,9 @@ export const updateUserPreferences = (prefs: Partial<UserPreferences>): Promise<
 
 export const getAvailableTags = (): Promise<string[]> =>
   apiClient.get('/tags').then((r) => r.data.tags);
+
+export const getBadge = (): Promise<{ count: number }> =>
+  apiClient.get('/users/me/badge').then((r) => r.data);
 
 export const resetBadge = (): Promise<void> =>
   apiClient.post('/users/me/badge/reset').then((r) => r.data);

@@ -44,7 +44,10 @@ export class EventsService implements OnModuleInit {
 
   private forwardToMonitor(events: CreateEventDto[], userId?: string): void {
     const url = process.env.MONITOR_INGESTOR_URL;
-    if (!url) return;
+    if (!url) {
+      this.logger.warn('MONITOR_INGESTOR_URL not set — skipping event forward');
+      return;
+    }
 
     const payload = events.map((e) => ({
       event_type: e.event_type,
@@ -63,7 +66,13 @@ export class EventsService implements OnModuleInit {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    }).catch(() => {});
+    }).then((res) => {
+      if (!res.ok) {
+        this.logger.warn(`Monitor ingestor responded ${res.status}`);
+      }
+    }).catch((err) => {
+      this.logger.error('Failed to forward events to monitor', err?.message);
+    });
   }
 
   async saveEvents(events: CreateEventDto[], userId?: string): Promise<void> {
