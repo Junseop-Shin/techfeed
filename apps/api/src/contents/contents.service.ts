@@ -1,9 +1,12 @@
 import * as crypto from 'crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Model } from 'mongoose';
+import { DataSource } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
 import { Content, ContentDocument } from './content.schema';
 import { SearchService, SearchContentsOptions } from '../search/search.service';
 import { CacheService } from '../cache/cache.service';
@@ -14,6 +17,7 @@ const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
 @Injectable()
 export class ContentsService {
   private readonly gemini: GoogleGenerativeAI | null;
+  private readonly logger = new Logger(ContentsService.name);
 
   constructor(
     @InjectModel(Content.name) private readonly contentModel: Model<ContentDocument>,
@@ -21,19 +25,66 @@ export class ContentsService {
     private readonly cacheService: CacheService,
     private readonly configService: ConfigService,
     private readonly subscriptionsService: SubscriptionsService,
+    @InjectDataSource() private readonly dataSource: DataSource,
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     this.gemini = apiKey ? new GoogleGenerativeAI(apiKey) : null;
   }
 
-  async search(opts: SearchContentsOptions) {
+  async search(opts: SearchContentsOptions & { sort?: string }) {
     const cacheKey = 'search:' + crypto.createHash('md5').update(JSON.stringify(opts)).digest('hex');
     const cached = await this.cacheService.getFeedCache(cacheKey);
     if (cached) return JSON.parse(cached);
 
     const result = await this.searchService.searchContents(opts);
+
+    if (opts.sort === 'likes' || opts.sort === 'bookmarks') {
+      const ids = result.items.map((i: any) => i.id as string);
+      const table = opts.sort === 'likes' ? 'likes' : 'bookmarks';
+      const rows = await this.dataSource.query<{ content_id: string; count: string }[]>(
+        `SELECT content_id, COUNT(*) as count FROM ${table} WHERE content_id = ANY($1) GROUP BY content_id`,
+        [ids],
+      );
+      const countMap = new Map(rows.map((r) => [r.content_id, parseInt(r.count, 10)]));
+      result.items.sort((a: any, b: any) => (countMap.get(b.id) ?? 0) - (countMap.get(a.id) ?? 0));
+      return result;
+    }
+
     await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
     return result;
+  }
+
+  @Cron('0 2 * * *')
+  async cleanupOldContent(): Promise<void> {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const oldContents = await this.contentModel
+      .find({ published_at: { $lt: cutoff } }, { _id: 1 })
+      .lean()
+      .exec();
+
+    if (oldContents.length === 0) return;
+
+    const ids = oldContents.map((c) => String(c._id));
+
+    const [bookmarked, commented] = await Promise.all([
+      this.dataSource.query<{ content_id: string }[]>(
+        `SELECT DISTINCT content_id FROM bookmarks WHERE content_id = ANY($1)`, [ids],
+      ),
+      this.dataSource.query<{ content_id: string }[]>(
+        `SELECT DISTINCT content_id FROM comments WHERE content_id = ANY($1)`, [ids],
+      ),
+    ]);
+
+    const protected_ = new Set([
+      ...bookmarked.map((r) => r.content_id),
+      ...commented.map((r) => r.content_id),
+    ]);
+
+    const toDelete = ids.filter((id) => !protected_.has(id));
+    if (toDelete.length === 0) return;
+
+    await this.contentModel.deleteMany({ _id: { $in: toDelete } });
+    this.logger.log(`Cleanup: deleted ${toDelete.length} old contents without engagement`);
   }
 
   async getTrending() {

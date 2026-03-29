@@ -5,14 +5,16 @@ import {
   Get,
   NotFoundException,
   Patch,
+  Post,
   Put,
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService, UserStats } from './users.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { RedisProvider } from '../cache/redis.provider';
 
 class UpdateTagsDto {
   @IsArray()
@@ -23,6 +25,12 @@ class UpdateTagsDto {
 class UpdateFcmTokenDto {
   @IsString()
   fcm_token: string;
+}
+
+class UpdateNameDto {
+  @IsString()
+  @MaxLength(30)
+  name: string;
 }
 
 class UpdatePreferencesDto {
@@ -43,7 +51,14 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly redisProvider: RedisProvider,
   ) {}
+
+  @Post('badge/reset')
+  async resetBadge(@Request() req: { user: { userId: string } }) {
+    await this.redisProvider.client.set(`badge:${req.user.userId}`, 0);
+    return { success: true };
+  }
 
   @Get()
   async getMe(@Request() req: { user: { userId: string; email: string } }) {
@@ -116,6 +131,15 @@ export class UsersController {
   @Delete('fcm-token')
   async removeFcmToken(@Request() req: { user: { userId: string } }) {
     await this.usersService.removeFcmToken(req.user.userId);
+    return { success: true };
+  }
+
+  @Patch('name')
+  async updateName(
+    @Request() req: { user: { userId: string } },
+    @Body() dto: UpdateNameDto,
+  ) {
+    await this.usersService.updateName(req.user.userId, dto.name);
     return { success: true };
   }
 }

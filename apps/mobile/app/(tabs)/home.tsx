@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useThemeStore } from '../../src/store/theme.store';
@@ -21,7 +22,7 @@ function formatDate(dateStr: string): string {
 }
 
 interface StatCardProps {
-  icon: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
   itemCount: number;
   bookmarkCount: number;
@@ -46,7 +47,7 @@ function StatCard({ icon, label, itemCount, bookmarkCount, onPress }: StatCardPr
       alignItems: 'center' as const,
       gap: 10,
     },
-    statIcon: { fontSize: 18 },
+    statIcon: {},
     statLabel: {
       fontSize: 15,
       fontWeight: '600' as const,
@@ -89,7 +90,7 @@ function StatCard({ icon, label, itemCount, bookmarkCount, onPress }: StatCardPr
       accessibilityLabel={`${label} 탭으로 이동`}
     >
       <View style={styles.statCardLeft}>
-        <Text style={styles.statIcon}>{icon}</Text>
+        <Ionicons name={icon} size={20} color={colors.textSecondary} />
         <Text style={styles.statLabel}>{label}</Text>
       </View>
       <View style={styles.statCardRight}>
@@ -108,13 +109,13 @@ function StatCard({ icon, label, itemCount, bookmarkCount, onPress }: StatCardPr
 }
 
 function BlogStats() {
-  const { data } = useContents({ source_type: 'blog', limit: 20 });
+  const { data } = useContents({ source_type: 'blog', limit: 1 });
   const { data: bookmarks } = useBookmarksByType('blog');
-  const itemCount = data?.items?.length ?? 0;
+  const itemCount = data?.total ?? 0;
   const bookmarkCount = bookmarks?.length ?? 0;
   return (
     <StatCard
-      icon="✏"
+      icon="document-text-outline"
       label="블로그"
       itemCount={itemCount}
       bookmarkCount={bookmarkCount}
@@ -124,13 +125,13 @@ function BlogStats() {
 }
 
 function YoutubeStats() {
-  const { data } = useContents({ source_type: 'youtube', limit: 20 });
+  const { data } = useContents({ source_type: 'youtube', limit: 1 });
   const { data: bookmarks } = useBookmarksByType('youtube');
-  const itemCount = data?.items?.length ?? 0;
+  const itemCount = data?.total ?? 0;
   const bookmarkCount = bookmarks?.length ?? 0;
   return (
     <StatCard
-      icon="▶"
+      icon="logo-youtube"
       label="YouTube"
       itemCount={itemCount}
       bookmarkCount={bookmarkCount}
@@ -140,13 +141,13 @@ function YoutubeStats() {
 }
 
 function JobStats() {
-  const { data } = useContents({ source_type: 'job', limit: 20 });
+  const { data } = useContents({ source_type: 'job', limit: 1 });
   const { data: bookmarks } = useBookmarksByType('job');
-  const itemCount = data?.items?.length ?? 0;
+  const itemCount = data?.total ?? 0;
   const bookmarkCount = bookmarks?.length ?? 0;
   return (
     <StatCard
-      icon="💼"
+      icon="briefcase-outline"
       label="채용공고"
       itemCount={itemCount}
       bookmarkCount={bookmarkCount}
@@ -337,11 +338,17 @@ function RecentFeed() {
   return (
     <>
       {items.map((item) => (
-        <View key={item.id} style={styles.recentItem}>
+        <TouchableOpacity
+          key={item.id}
+          style={styles.recentItem}
+          onPress={() => router.push(`/content/${item.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel={item.title}
+        >
           <Text style={styles.recentSource}>{item.source_name}</Text>
           <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
           <Text style={styles.recentDate}>{formatDate(item.published_at)}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </>
   );
@@ -367,7 +374,6 @@ export default function HomeScreen() {
     },
     headerTitle: { fontSize: 22, fontWeight: '700' as const, color: colors.textPrimary, letterSpacing: -0.5 },
     notifBtn: { padding: 4 },
-    notifIcon: { fontSize: 20 },
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: 32 },
     greetingCard: {
@@ -400,11 +406,12 @@ export default function HomeScreen() {
         <Text style={styles.headerTitle}>TechFeed</Text>
         <TouchableOpacity
           style={styles.notifBtn}
+          onPress={() => router.push('/(tabs)/settings')}
           accessibilityRole="button"
-          accessibilityLabel="알림"
+          accessibilityLabel="설정"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.notifIcon}>🔔</Text>
+          <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 

@@ -100,6 +100,10 @@ export class UsersService {
     await this.userRepo.update(userId, { fcm_token: null });
   }
 
+  async updateName(userId: string, name: string): Promise<void> {
+    await this.userRepo.update(userId, { name });
+  }
+
   async getStats(userId: string): Promise<UserStats> {
     // week_reads: 최근 7일
     const weekReadsResult = await this.dataSource.query<{ count: string }[]>(

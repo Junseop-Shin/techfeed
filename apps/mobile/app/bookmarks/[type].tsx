@@ -82,9 +82,8 @@ interface StatusTab {
 }
 
 const CONTENT_STATUS_TABS: StatusTab[] = [
-  { value: 'to_read', label: '읽어볼것' },
-  { value: 'reading', label: '읽는중' },
-  { value: 'read', label: '읽어봄' },
+  { value: 'interested', label: '관심' },
+  { value: 'done', label: '완독' },
   { value: 'shared', label: '공유함' },
 ];
 
@@ -105,9 +104,45 @@ interface BookmarkItemRowProps {
   item: BookmarkItem;
   statusTabs: StatusTab[];
   onStatusChange: (contentId: string, status: string) => void;
+  colors: ReturnType<typeof useThemeStore>['colors'] extends infer C ? C : never;
 }
 
-function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowProps) {
+function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkItemRowProps) {
+  const styles = useMemo(() => StyleSheet.create({
+    statusBadgeWrapper: {
+      position: 'absolute' as const,
+      top: 14,
+      right: 28,
+      flexDirection: 'column' as const,
+      alignItems: 'flex-end' as const,
+      gap: 4,
+    },
+    statusBadge: {
+      backgroundColor: colors.primaryDim,
+      borderRadius: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    statusBadgeText: {
+      fontSize: 11,
+      fontWeight: '600' as const,
+      color: colors.primary,
+    },
+    fallbackRow: {
+      marginHorizontal: 16,
+      marginVertical: 6,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+    },
+    fallbackId: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+  }), [colors]);
+
   const handleLongPress = () => {
     const options = statusTabs.map((tab) => ({
       text: tab.label,
@@ -128,10 +163,10 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowPr
 
   return (
     <TouchableOpacity
-      style={styles.bookmarkRow}
+      style={{ position: 'relative' }}
       onLongPress={handleLongPress}
       accessibilityRole="button"
-      accessibilityLabel={`북마크 아이템, 길게 눌러 상태 변경`}
+      accessibilityLabel="북마크 아이템, 길게 눌러 상태 변경"
       accessibilityHint="길게 누르면 상태를 변경할 수 있습니다"
     >
       {item.content ? (
@@ -158,6 +193,7 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange }: BookmarkItemRowPr
 export default function BookmarksTypeScreen() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const token = useAuthStore((s) => s.token);
+  const colors = useThemeStore((s) => s.colors);
 
   const validType = isValidType(type ?? '') ? (type as ContentTypeParam) : 'blog';
   const contentType = CONTENT_TYPE_MAP[validType];
@@ -184,15 +220,115 @@ export default function BookmarksTypeScreen() {
     [updateStatus]
   );
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.bg },
+    header: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '700' as const,
+      color: colors.textPrimary,
+    },
+    backBtn: {
+      width: 32,
+      alignItems: 'flex-start' as const,
+    },
+    backBtnText: {
+      fontSize: 20,
+      color: colors.primary,
+      fontWeight: '600' as const,
+    },
+    statusTabsWrapper: {
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    statusTabsContent: {
+      paddingHorizontal: 16,
+    },
+    statusTab: {
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginRight: 4,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    statusTabActive: {
+      borderBottomColor: colors.primary,
+    },
+    statusTabText: {
+      fontSize: 14,
+      fontWeight: '500' as const,
+      color: colors.textSecondary,
+    },
+    statusTabTextActive: {
+      color: colors.primary,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      paddingTop: 80,
+    },
+    message: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      marginBottom: 20,
+      textAlign: 'center' as const,
+    },
+    loginButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    loginButtonText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '600' as const,
+    },
+    retryButton: {
+      marginTop: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    retryText: {
+      fontSize: 14,
+      color: colors.primary,
+    },
+    errorText: {
+      fontSize: 14,
+      color: colors.danger,
+      marginBottom: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    list: {
+      paddingVertical: 8,
+      paddingBottom: 24,
+    },
+  }), [colors]);
+
   const renderItem = useCallback(
     ({ item }: { item: BookmarkItem }) => (
       <BookmarkItemRow
         item={item}
         statusTabs={statusTabs}
         onStatusChange={handleStatusChange}
+        colors={colors}
       />
     ),
-    [statusTabs, handleStatusChange]
+    [statusTabs, handleStatusChange, colors]
   );
 
   const keyExtractor = useCallback((item: BookmarkItem) => String(item.id), []);
@@ -241,7 +377,6 @@ export default function BookmarksTypeScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {/* Status tabs */}
       <View style={styles.statusTabsWrapper}>
         <ScrollView
           horizontal
@@ -275,7 +410,7 @@ export default function BookmarksTypeScreen() {
 
       {isLoading && (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
       {isError && (
@@ -306,147 +441,3 @@ export default function BookmarksTypeScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  backBtn: {
-    width: 32,
-    alignItems: 'flex-start',
-  },
-  backBtnText: {
-    fontSize: 20,
-    color: '#2563EB',
-    fontWeight: '600',
-  },
-  statusTabsWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  statusTabsContent: {
-    paddingHorizontal: 16,
-  },
-  statusTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginRight: 4,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  statusTabActive: {
-    borderBottomColor: '#2563EB',
-  },
-  statusTabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  statusTabTextActive: {
-    color: '#2563EB',
-  },
-  bookmarkRow: {
-    position: 'relative',
-  },
-  statusBadgeWrapper: {
-    position: 'absolute',
-    top: 14,
-    right: 28,
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  statusBadge: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
-  fallbackRow: {
-    marginHorizontal: 16,
-    marginVertical: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-  },
-  fallbackId: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  list: {
-    paddingVertical: 8,
-    paddingBottom: 24,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 80,
-  },
-  message: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  loginButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  retryButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  retryText: {
-    fontSize: 14,
-    color: '#2563EB',
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#EF4444',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-});
-
-/*
-Usage:
-router.push('/bookmarks/blog')    → 블로그 북마크 (to_read | reading | read | shared)
-router.push('/bookmarks/youtube') → YouTube 북마크 (to_read | reading | read | shared)
-router.push('/bookmarks/jobs')    → 채용공고 북마크 (interested | to_apply | applied | interviewing | accepted | rejected)
-*/

@@ -9,8 +9,8 @@ interface JobBookmarkForAlert {
 }
 
 const DEFAULT_STATUS: Record<string, string> = {
-  blog: 'to_read',
-  youtube: 'to_read',
+  blog: 'interested',
+  youtube: 'interested',
   job: 'interested',
 };
 
@@ -31,8 +31,8 @@ export class BookmarksService {
     });
   }
 
-  async add(userId: string, contentId: string, contentType?: string): Promise<void> {
-    const status = contentType ? (DEFAULT_STATUS[contentType] ?? null) : null;
+  async add(userId: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
+    const status = statusOverride ?? (contentType ? (DEFAULT_STATUS[contentType] ?? null) : null);
     try {
       const bookmark = this.repo.create({
         user: { id: userId },

@@ -1,12 +1,5 @@
 import { apiClient } from './client';
-
-export interface EventPayload {
-  event_type: 'read' | 'click' | 'bookmark' | 'share';
-  content_id: string;
-  tag?: string;
-  duration_ms?: number;
-  metadata?: Record<string, unknown>;
-}
+export { trackEvent } from './analytics';
 
 export interface Content {
   id: string;
@@ -41,6 +34,7 @@ export interface ContentsParams {
   source_type?: string;
   page?: number;
   limit?: number;
+  sort?: 'date' | 'views' | 'likes' | 'bookmarks';
 }
 
 export const getContents = (params: ContentsParams): Promise<ContentsResponse> =>
@@ -61,8 +55,6 @@ export const getContentSummary = (id: string): Promise<{ summary: string }> =>
 export const getRecommended = (): Promise<ContentsResponse> =>
   apiClient.get('/contents/recommended').then((r) => r.data);
 
-export const trackEvent = (events: EventPayload[]): void => {
-  apiClient.post('/events', events).catch(() => {
-    // Silently fail — event tracking must not disrupt user experience
-  });
-};
+export const toggleLike = (contentId: string): Promise<{ liked: boolean; like_count: number }> =>
+  apiClient.post(`/contents/${contentId}/like`).then((r) => r.data);
+

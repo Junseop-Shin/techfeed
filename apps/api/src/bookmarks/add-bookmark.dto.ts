@@ -5,4 +5,8 @@ export class AddBookmarkDto {
   @IsString()
   @IsIn(['blog', 'youtube', 'job'])
   content_type?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

@@ -13,6 +13,7 @@ export interface SearchContentsOptions {
   source_type?: string;
   page?: number;
   limit?: number;
+  sort?: string;
 }
 
 @Injectable()
@@ -78,7 +79,7 @@ export class SearchService implements OnModuleInit {
   }
 
   async searchContents(opts: SearchContentsOptions) {
-    const { q, tags, source_type, page = 1, limit = 20 } = opts;
+    const { q, tags, source_type, page = 1, limit = 20, sort = 'date' } = opts;
     const from = (page - 1) * limit;
 
     const must: QueryDslQueryContainer[] = [];
@@ -112,12 +113,17 @@ export class SearchService implements OnModuleInit {
       query = { match_all: {} };
     }
 
+    const esSort =
+      sort === 'views'
+        ? [{ view_count: { order: 'desc' as const } }]
+        : [{ published_at: { order: 'desc' as const } }];
+
     const result = await this.es.client.search({
       index: INDEX_NAME,
       from,
       size: limit,
       query,
-      sort: [{ published_at: { order: 'desc' } }],
+      sort: esSort,
     });
 
     const hits = result.hits.hits;

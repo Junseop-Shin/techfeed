@@ -34,7 +34,7 @@ export class BookmarksController {
     @Param('contentId') contentId: string,
     @Body() body: AddBookmarkDto,
   ) {
-    await this.bookmarksService.add(req.user.userId, contentId, body.content_type);
+    await this.bookmarksService.add(req.user.userId, contentId, body.content_type, body.status);
     return { success: true };
   }
 

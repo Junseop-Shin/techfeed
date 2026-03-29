@@ -3,6 +3,7 @@ import { Client } from '@elastic/elasticsearch';
 import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
 import { blogSources, keywordTagMap } from '../config';
+import { CrawlerSourceDoc } from '../models/source.model';
 
 const TECH_KEYWORDS = Object.values(keywordTagMap).flat();
 
@@ -21,21 +22,34 @@ function stripHtml(html: string): string {
 }
 
 export class BlogCrawler extends BaseCrawler {
-  constructor(esClient: Client, redis: Redis) {
+  private sources: Array<{ name: string; url: string; tags: string[] }>;
+
+  constructor(
+    esClient: Client,
+    redis: Redis,
+    dbSources?: CrawlerSourceDoc[],
+  ) {
     super(esClient, redis);
+    if (dbSources && dbSources.length > 0) {
+      this.sources = dbSources
+        .filter((s) => s.type === 'blog' && s.url)
+        .map((s) => ({ name: s.name, url: s.url!, tags: s.tags }));
+    } else {
+      this.sources = blogSources.map((s) => ({ name: s.name, url: s.url, tags: [...s.tags] }));
+    }
   }
 
   async crawl(): Promise<RawContent[]> {
     const results: RawContent[] = [];
 
-    for (const source of blogSources) {
+    for (const source of this.sources) {
       try {
         const feed = await parser.parseURL(source.url);
 
         for (const item of feed.items) {
           if (!item.link || !item.title) continue;
 
-          // Velog: Korean filter + tech keyword filter (스팸/비기술 글 제거)
+          // Velog: Korean filter + tech keyword filter
           if (source.name === 'Velog 트렌딩') {
             if (!hasKorean(item.title)) continue;
             const text = `${item.title} ${item.contentSnippet ?? ''}`.toLowerCase();

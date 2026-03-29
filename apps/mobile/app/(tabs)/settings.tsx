@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   Switch,
@@ -10,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -20,20 +22,27 @@ import { useThemeStore } from '../../src/store/theme.store';
 import {
   getProfile,
   updateTags,
+  updateName,
   subscribePush,
   removePushToken,
   getUserStats,
   getUserPreferences,
   updateUserPreferences,
-  getAvailableTags,
 } from '../../src/api/users';
+import { COMMON_TAGS, tagsToCategories, expandTagsForSave } from '../../src/constants/tags';
+import { submitReview } from '../../src/api/reviews';
+import { trackEvent } from '../../src/api/analytics';
 
 async function getAndRegisterPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') return null;
-  const tokenData = await Notifications.getExpoPushTokenAsync();
-  return tokenData.data;
+  try {
+    const tokenData = await Notifications.getDevicePushTokenAsync();
+    return tokenData.data;
+  } catch {
+    return null;
+  }
 }
 
 export default function SettingsScreen() {
@@ -60,38 +69,53 @@ export default function SettingsScreen() {
     enabled: !!token,
   });
 
-  const { data: availableTags = [] } = useQuery({
-    queryKey: ['availableTags'],
-    queryFn: getAvailableTags,
-    staleTime: 1000 * 60 * 60, // 1 hour
-  });
-
-  const [tags, setTags] = useState<string[]>([]);
+  // category values (e.g. 'frontend', 'backend') — converted to tech tags on save
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [channels, setChannels] = useState<string[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelsRef = useRef<string[]>([]);
+  const channelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelsInitialized = useRef(false);
+
+  // nickname state
+  const [nameInput, setNameInput] = useState('');
+  const [nameSaved, setNameSaved] = useState(false);
 
   useEffect(() => {
     if (profile?.tags) {
-      setTags(profile.tags);
+      setSelectedCategories(tagsToCategories(profile.tags));
     }
   }, [profile?.tags]);
 
   useEffect(() => {
+    if (profile?.name) {
+      setNameInput(profile.name);
+    }
+  }, [profile?.name]);
+
+  useEffect(() => {
     if (preferences?.channels) {
       setChannels(preferences.channels);
+      channelsRef.current = preferences.channels;
+      channelsInitialized.current = true;
     }
   }, [preferences?.channels]);
 
-  const handleChannelToggle = (channel: string) => {
-    setChannels((prev) => {
-      const next = prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel];
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        updateUserPreferences({ channels: next }).catch(() => {});
-      }, 500);
-      return next;
-    });
-  };
+  // BUG-002 fix: debounce runs in effect, not inside setState updater
+  // skip initial empty state to avoid wiping channels on slow network
+  useEffect(() => {
+    if (!channelsInitialized.current) return;
+    channelsRef.current = channels;
+    if (channelDebounceRef.current) clearTimeout(channelDebounceRef.current);
+    channelDebounceRef.current = setTimeout(() => {
+      updateUserPreferences({ channels: channelsRef.current }).catch(() => {});
+    }, 500);
+  }, [channels]);
+
+  const handleChannelToggle = useCallback((channel: string) => {
+    setChannels((prev) =>
+      prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel]
+    );
+  }, []);
 
   const { mutate: saveTags, isPending: isSaving } = useMutation({
     mutationFn: updateTags,
@@ -105,21 +129,63 @@ export default function SettingsScreen() {
   });
 
   const handleSaveTags = () => {
-    saveTags(tags);
+    saveTags(expandTagsForSave(selectedCategories));
   };
 
-  const togglePredefinedTag = useCallback((tag: string) => {
-    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  const toggleCategory = useCallback((value: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value]
+    );
   }, []);
+
+  const { mutate: saveNameMutation, isPending: isSavingName } = useMutation({
+    mutationFn: () => updateName(nameInput.trim()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 2000);
+    },
+    onError: () => {
+      Alert.alert('오류', '이름 변경에 실패했습니다.');
+    },
+  });
+
+  const handleSaveName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) { Alert.alert('오류', '이름을 입력해주세요.'); return; }
+    saveNameMutation();
+  };
+
+  // Review state
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewBody, setReviewBody] = useState('');
+  const [reviewSent, setReviewSent] = useState(false);
+
+  const { mutate: sendReview, isPending: isReviewPending } = useMutation({
+    mutationFn: () => submitReview(reviewRating, reviewBody.trim() || undefined),
+    onSuccess: () => {
+      setReviewSent(true);
+      setReviewRating(0);
+      setReviewBody('');
+    },
+    onError: () => Alert.alert('오류', '리뷰 제출에 실패했습니다.'),
+  });
+
+  const handleSendReview = () => {
+    if (reviewRating === 0) { Alert.alert('별점을 선택해주세요.'); return; }
+    sendReview();
+  };
 
   const handleTogglePush = async (enabled: boolean) => {
     try {
       if (!enabled) {
         await removePushToken();
+        trackEvent([{ event_type: 'push_disable' }]);
       } else {
         const pushToken = await getAndRegisterPushToken();
         if (pushToken) {
           await subscribePush(pushToken);
+          trackEvent([{ event_type: 'push_enable' }]);
         } else {
           Alert.alert('알림 권한', '설정 앱에서 알림 권한을 허용해주세요.');
           return;
@@ -219,15 +285,35 @@ export default function SettingsScreen() {
     },
     themeBtnText: { fontSize: 14, fontWeight: '500' as const, color: colors.textSecondary },
     themeBtnTextActive: { color: '#FFFFFF', fontWeight: '600' as const },
-    tagList: {
+    nameRow: {
       flexDirection: 'row' as const,
-      flexWrap: 'wrap' as const,
-      marginBottom: 12,
+      alignItems: 'center' as const,
+      gap: 8,
+      marginTop: 8,
     },
+    nameInput: {
+      flex: 1,
+      backgroundColor: colors.searchBg,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: colors.textPrimary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    nameSaveBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    nameSaveBtnText: { fontSize: 14, fontWeight: '600' as const, color: '#FFFFFF' },
+    nameSavedText: { fontSize: 13, color: colors.primary, marginTop: 4 },
     predefinedTagList: {
       flexDirection: 'row' as const,
       flexWrap: 'wrap' as const,
-      marginBottom: 16,
+      marginBottom: 4,
     },
     predefinedChip: {
       paddingHorizontal: 12,
@@ -345,6 +431,32 @@ export default function SettingsScreen() {
       height: 4,
       borderRadius: 2,
     },
+    sourcesNavBtn: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      marginTop: 4,
+    },
+    sourcesNavText: { fontSize: 15, fontWeight: '500' as const, color: colors.textPrimary },
+    sourcesNavArrow: { fontSize: 18, color: colors.textSecondary },
+    starRow: { flexDirection: 'row' as const, gap: 8, marginVertical: 12 },
+    reviewInput: {
+      backgroundColor: colors.searchBg,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: colors.textPrimary,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 80,
+      textAlignVertical: 'top' as const,
+      marginBottom: 12,
+    },
+    reviewSentText: { fontSize: 13, color: colors.primary, textAlign: 'center' as const, marginBottom: 8 },
   }), [colors]);
 
   if (!token) {
@@ -396,13 +508,40 @@ export default function SettingsScreen() {
             <Text style={styles.profileName}>{user?.name || profile?.name || '이름 없음'}</Text>
             <Text style={styles.profileEmail}>{user?.email ?? profile?.email}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.dangerButton}
-            onPress={handleLogout}
-            accessibilityRole="button"
-          >
-            <Text style={styles.dangerButtonText}>로그아웃</Text>
-          </TouchableOpacity>
+          <Text style={styles.settingTitle}>닉네임 변경</Text>
+          <View style={styles.nameRow}>
+            <TextInput
+              style={styles.nameInput}
+              value={nameInput}
+              onChangeText={setNameInput}
+              placeholder="표시 이름 입력"
+              placeholderTextColor={colors.textSecondary}
+              maxLength={30}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={[styles.nameSaveBtn, isSavingName && styles.buttonDisabled]}
+              onPress={handleSaveName}
+              disabled={isSavingName}
+              accessibilityRole="button"
+            >
+              {isSavingName
+                ? <ActivityIndicator size="small" color="#FFFFFF" />
+                : <Text style={styles.nameSaveBtnText}>저장</Text>
+              }
+            </TouchableOpacity>
+          </View>
+          {nameSaved && <Text style={styles.nameSavedText}>닉네임이 변경되었습니다.</Text>}
+          <View style={{ marginTop: 16 }}>
+            <TouchableOpacity
+              style={styles.dangerButton}
+              onPress={handleLogout}
+              accessibilityRole="button"
+            >
+              <Text style={styles.dangerButtonText}>로그아웃</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 독서 통계 */}
@@ -513,30 +652,46 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* 구독 소스 관리 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>구독 소스</Text>
+          <Text style={styles.sectionDescription}>
+            특정 블로그, YouTube 채널, 채용 사이트를 팔로우하면 해당 소스의 콘텐츠를 우선 확인할 수 있습니다.
+          </Text>
+          <TouchableOpacity
+            style={styles.sourcesNavBtn}
+            onPress={() => router.push('/settings/sources')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.sourcesNavText}>소스 팔로우 관리</Text>
+            <Text style={styles.sourcesNavArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 구독 태그 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>구독 태그</Text>
           <Text style={styles.sectionDescription}>
-            관심 있는 기술 태그를 등록하면 맞춤 피드를 받을 수 있습니다.
+            관심 카테고리를 선택하면 블로그·YouTube·채용공고 전체에서 맞춤 피드와 푸시 알림을 받을 수 있습니다.
           </Text>
           {isLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />
           ) : (
             <>
               <View style={styles.predefinedTagList}>
-                {availableTags.map((tag) => {
-                  const active = tags.includes(tag);
+                {COMMON_TAGS.map((tag) => {
+                  const active = selectedCategories.includes(tag.value);
                   return (
                     <TouchableOpacity
-                      key={tag}
+                      key={tag.value}
                       style={[styles.predefinedChip, active && styles.predefinedChipActive]}
-                      onPress={() => togglePredefinedTag(tag)}
+                      onPress={() => toggleCategory(tag.value)}
                       accessibilityRole="checkbox"
-                      accessibilityLabel={tag}
+                      accessibilityLabel={tag.label}
                       accessibilityState={{ checked: active }}
                     >
                       <Text style={[styles.predefinedChipText, active && styles.predefinedChipTextActive]}>
-                        {tag}
+                        {tag.label}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -557,6 +712,52 @@ export default function SettingsScreen() {
             </>
           )}
         </View>
+        {/* 앱 리뷰 */}
+        {token && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>앱 리뷰</Text>
+            <Text style={styles.sectionDescription}>
+              techfeed를 사용해보셨나요? 솔직한 의견을 남겨주세요.
+            </Text>
+            {reviewSent ? (
+              <Text style={styles.reviewSentText}>리뷰를 남겨주셔서 감사합니다!</Text>
+            ) : (
+              <>
+                <View style={styles.starRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity key={star} onPress={() => setReviewRating(star)} accessibilityRole="button" accessibilityLabel={`${star}점`}>
+                      <Ionicons
+                        name={star <= reviewRating ? 'star' : 'star-outline'}
+                        size={32}
+                        color={star <= reviewRating ? '#F59E0B' : colors.textTertiary}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput
+                  style={styles.reviewInput}
+                  value={reviewBody}
+                  onChangeText={setReviewBody}
+                  placeholder="의견을 자유롭게 남겨주세요 (선택)"
+                  placeholderTextColor={colors.textSecondary}
+                  multiline
+                  maxLength={1000}
+                />
+                <TouchableOpacity
+                  style={[styles.primaryButton, isReviewPending && styles.buttonDisabled]}
+                  onPress={handleSendReview}
+                  disabled={isReviewPending}
+                  accessibilityRole="button"
+                >
+                  {isReviewPending
+                    ? <ActivityIndicator color="#FFFFFF" size="small" />
+                    : <Text style={styles.primaryButtonText}>리뷰 제출</Text>
+                  }
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

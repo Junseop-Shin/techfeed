@@ -3,8 +3,8 @@ import { apiClient } from './client';
 export interface Comment {
   id: number;
   body: string;
-  author_name: string;
   created_at: string;
+  user: { id: string; name: string };
 }
 
 export const getComments = (contentId: string): Promise<Comment[]> =>

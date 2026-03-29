@@ -1,12 +1,26 @@
-import { youtube_v3, auth } from '@googleapis/youtube';
+import { youtube_v3 } from '@googleapis/youtube';
 import { Client } from '@elastic/elasticsearch';
 import Redis from 'ioredis';
 import { BaseCrawler, RawContent } from './base.crawler';
 import { youtubeSources, config } from '../config';
+import { CrawlerSourceDoc } from '../models/source.model';
 
 export class YouTubeCrawler extends BaseCrawler {
-  constructor(esClient: Client, redis: Redis) {
+  private sources: Array<{ name: string; channelId: string; tags: string[] }>;
+
+  constructor(
+    esClient: Client,
+    redis: Redis,
+    dbSources?: CrawlerSourceDoc[],
+  ) {
     super(esClient, redis);
+    if (dbSources && dbSources.length > 0) {
+      this.sources = dbSources
+        .filter((s) => s.type === 'youtube' && s.channelId)
+        .map((s) => ({ name: s.name, channelId: s.channelId!, tags: s.tags }));
+    } else {
+      this.sources = youtubeSources.map((s) => ({ name: s.name, channelId: s.channelId, tags: [...s.tags] }));
+    }
   }
 
   async crawl(): Promise<RawContent[]> {
@@ -21,9 +35,8 @@ export class YouTubeCrawler extends BaseCrawler {
 
     const results: RawContent[] = [];
 
-    for (const source of youtubeSources) {
+    for (const source of this.sources) {
       try {
-        // Get the channel's uploads playlist
         const channelRes = await youtube.channels.list({
           part: ['contentDetails'],
           id: [source.channelId],
@@ -34,7 +47,6 @@ export class YouTubeCrawler extends BaseCrawler {
           channelRes.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
         if (!uploadsPlaylistId) continue;
 
-        // Fetch latest videos from uploads playlist
         const playlistRes = await youtube.playlistItems.list({
           part: ['snippet'],
           playlistId: uploadsPlaylistId,

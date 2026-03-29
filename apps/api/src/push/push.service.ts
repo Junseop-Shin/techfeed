@@ -10,12 +10,26 @@ export class PushService {
     title: string,
     body: string,
     data?: Record<string, string>,
+    badge?: number,
   ): Promise<void> {
     try {
       await admin.messaging().send({
         token,
         notification: { title, body },
         data,
+        apns: {
+          payload: {
+            aps: {
+              badge: badge ?? 1,
+              sound: 'default',
+            },
+          },
+        },
+        android: {
+          notification: {
+            notificationCount: badge ?? 1,
+          },
+        },
       });
     } catch (err) {
       this.logger.error(`FCM send failed for token ${token.slice(0, 10)}...`, err);

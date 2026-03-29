@@ -18,7 +18,12 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://techfeed-api.nuclearbomb6518.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "426208718633-fprs6t6ncjnf8tp86ns38phfsn3jtkq0.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "426208718633-fprs6t6ncjnf8tp86ns38phfsn3jtkq0.apps.googleusercontent.com"
+      }
     },
     "production": {}
   },

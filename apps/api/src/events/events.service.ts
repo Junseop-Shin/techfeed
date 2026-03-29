@@ -25,6 +25,7 @@ export class EventsService implements OnModuleInit {
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS user_events (
         time        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        device_id   VARCHAR(100),
         user_id     UUID,
         event_type  VARCHAR(50),
         content_id  VARCHAR(100),
@@ -53,6 +54,7 @@ export class EventsService implements OnModuleInit {
         content_id: e.content_id,
         tag: e.tag,
         duration_ms: e.duration_ms,
+        device_id: e.device_id,
       },
     }));
 
@@ -70,8 +72,8 @@ export class EventsService implements OnModuleInit {
 
     const values = events
       .map((_, i) => {
-        const base = i * 6;
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`;
+        const base = i * 7;
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
       })
       .join(', ');
 
@@ -80,15 +82,16 @@ export class EventsService implements OnModuleInit {
       params.push(
         userId ?? null,
         event.event_type,
-        event.content_id,
+        event.content_id ?? null,
         event.tag ?? null,
         event.duration_ms ?? null,
         event.metadata ? JSON.stringify(event.metadata) : null,
+        event.device_id ?? null,
       );
     }
 
     await this.dataSource.query(
-      `INSERT INTO user_events (user_id, event_type, content_id, tag, duration_ms, metadata)
+      `INSERT INTO user_events (user_id, event_type, content_id, tag, duration_ms, metadata, device_id)
        VALUES ${values}`,
       params,
     );

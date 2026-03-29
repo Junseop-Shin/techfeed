@@ -34,7 +34,7 @@ export class CommentsController {
       created_at: c.created_at,
       user: {
         id: c.user.id,
-        name: c.user.name,
+        name: c.user.name ?? '익명',
       },
     }));
   }

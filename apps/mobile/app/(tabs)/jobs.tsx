@@ -11,52 +11,76 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ContentCard } from '../../src/components/ContentCard';
 import { getContents } from '../../src/api/contents';
+import { getProfile } from '../../src/api/users';
 import { useThemeStore } from '../../src/store/theme.store';
-import type { Content } from '../../src/api/contents';
+import { useAuthStore } from '../../src/store/auth.store';
+import { useSeenStore } from '../../src/store/seen.store';
+import { COMMON_TAGS, expandTagsForQuery, tagsToCategories } from '../../src/constants/tags';
+import type { Content, ContentsParams } from '../../src/api/contents';
+import { trackEvent } from '../../src/api/analytics';
 
-const JOB_TAGS = ['React', 'TypeScript', 'Node.js', 'Python', 'Java', 'Kotlin', 'Go', 'AWS', 'DevOps', 'ML/AI', '신입', '경력'];
-
-const SUBJECT_FILTERS = [
-  { label: 'AI', tags: ['ai', 'llm', 'ml'] },
-  { label: '백엔드', tags: ['java', 'python', 'golang', 'kotlin', 'database'] },
-  { label: '프론트', tags: ['react', 'typescript', 'nextjs', 'swift'] },
-  { label: '보안', tags: ['security'] },
-  { label: 'DevOps', tags: ['devops', 'kubernetes', 'docker', 'aws'] },
-] as const;
+type SortOption = { label: string; value: ContentsParams['sort'] };
+const SORT_OPTIONS: SortOption[] = [
+  { label: '최신순', value: 'date' },
+  { label: '조회순', value: 'views' },
+  { label: '좋아요순', value: 'likes' },
+  { label: '북마크순', value: 'bookmarks' },
+];
 
 export default function JobsScreen() {
   const colors = useThemeStore((s) => s.colors);
+  const token = useAuthStore((s) => s.token);
+  const { isNew: checkIsNew, markVisited } = useSeenStore();
+
   const [query, setQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [sort, setSort] = useState<ContentsParams['sort']>('date');
   const [refreshing, setRefreshing] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [page, setPage] = useState(1);
   const [allItems, setAllItems] = useState<Content[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const initializedRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterInitRef = useRef(false);
 
-  const combinedTags = useMemo(() => {
-    const subjectTags = SUBJECT_FILTERS.find((s) => s.label === selectedSubject)?.tags ?? [];
-    const all = [...subjectTags, ...selectedTags];
-    return all.length > 0 ? all.join(',') : undefined;
-  }, [selectedSubject, selectedTags]);
-
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['contents', { source_type: 'job', q: submittedQuery, tags: combinedTags, page: 1 }],
-    queryFn: () => getContents({ source_type: 'job', q: submittedQuery || undefined, tags: combinedTags, page: 1, limit: 20 }),
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: getProfile,
+    enabled: !!token,
+    staleTime: 1000 * 60 * 5,
   });
 
   useEffect(() => {
-    setPage(1);
-    setAllItems([]);
-  }, [submittedQuery, combinedTags]);
+    if (profile?.tags && !initializedRef.current) {
+      const cats = tagsToCategories(profile.tags);
+      if (cats.length > 0) setSelectedCategories(cats);
+      initializedRef.current = true;
+    }
+  }, [profile?.tags]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => markVisited('job'), 3000);
+    return () => clearTimeout(timer);
+  }, [markVisited]);
+
+  const tagsParam = useMemo(() => {
+    const expanded = expandTagsForQuery(selectedCategories);
+    return expanded.length > 0 ? expanded.join(',') : undefined;
+  }, [selectedCategories]);
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['contents', { source_type: 'job', q: submittedQuery, tags: tagsParam, page: 1, sort }],
+    queryFn: () => getContents({ source_type: 'job', q: submittedQuery || undefined, tags: tagsParam, page: 1, limit: 20, sort }),
+  });
+
+  useEffect(() => { setPage(1); setAllItems([]); }, [submittedQuery, tagsParam, sort]);
 
   useEffect(() => {
     if (data?.items) {
@@ -70,31 +94,23 @@ export default function JobsScreen() {
     setIsLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const result = await getContents({ source_type: 'job', q: submittedQuery || undefined, tags: combinedTags, page: nextPage, limit: 20 });
-      setAllItems(prev => [...prev, ...result.items]);
+      const result = await getContents({ source_type: 'job', q: submittedQuery || undefined, tags: tagsParam, page: nextPage, limit: 20, sort });
+      setAllItems((prev) => [...prev, ...result.items]);
       setHasMore(allItems.length + result.items.length < result.total);
       setPage(nextPage);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, hasMore, page, submittedQuery, combinedTags, allItems.length]);
+  }, [isLoadingMore, hasMore, page, submittedQuery, tagsParam, sort, allItems.length]);
 
   const handleChangeText = useCallback((text: string) => {
     setQuery(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSubmittedQuery(text);
-    }, 300);
+    debounceRef.current = setTimeout(() => setSubmittedQuery(text), 300);
   }, []);
 
-  const toggleSubject = useCallback((label: string) => {
-    setSelectedSubject((prev) => (prev === label ? null : label));
-  }, []);
-
-  const toggleTag = useCallback((tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+  const toggleCategory = useCallback((value: string) => {
+    setSelectedCategories((prev) => prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value]);
   }, []);
 
   const handleRefresh = useCallback(async () => {
@@ -105,107 +121,57 @@ export default function JobsScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  // tab_visit: once on mount
+  useEffect(() => {
+    trackEvent([{ event_type: 'tab_visit', metadata: { tab: 'jobs' } }]);
+  }, []);
+
+  // search tracking: when debounced query is submitted
+  useEffect(() => {
+    if (submittedQuery) {
+      trackEvent([{ event_type: 'search', metadata: { tab: 'jobs', q: submittedQuery } }]);
+    }
+  }, [submittedQuery]);
+
+  // filter_apply: when categories or sort changes (after initial mount)
+  useEffect(() => {
+    if (!filterInitRef.current) { filterInitRef.current = true; return; }
+    trackEvent([{ event_type: 'filter_apply', metadata: { tab: 'jobs', categories: selectedCategories, sort } }]);
+  }, [selectedCategories, sort]);
+
   const renderItem = useCallback(
-    ({ item }: { item: Content }) => <ContentCard content={item} />,
-    []
+    ({ item }: { item: Content }) => (
+      <ContentCard content={item} isNew={checkIsNew('job', item.published_at)} />
+    ),
+    [checkIsNew]
   );
 
   const keyExtractor = useCallback((item: Content) => item.id, []);
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
-    header: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      justifyContent: 'space-between' as const,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
+    header: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     headerTitle: { fontSize: 20, fontWeight: '700' as const, color: colors.textPrimary },
     bookmarkBtn: { padding: 4 },
-    bookmarkBtnIcon: { fontSize: 22, color: colors.bookmark },
-    searchBar: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    searchInput: {
-      backgroundColor: colors.searchBg,
-      borderRadius: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      fontSize: 15,
-      color: colors.textPrimary,
-    },
-    tagsWrapper: {
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    tagsContent: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      gap: 8,
-      flexDirection: 'row' as const,
-    },
-    tagChip: {
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 20,
-      backgroundColor: colors.searchBg,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    tagChipActive: {
-      backgroundColor: colors.primaryDim,
-      borderColor: colors.primary,
-    },
-    tagChipText: { fontSize: 13, fontWeight: '500' as const, color: colors.textSecondary },
-    tagChipTextActive: { color: colors.primary },
-    subjectRow: {
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    subjectContent: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      gap: 8,
-      flexDirection: 'row' as const,
-    },
-    subjectChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 7,
-      borderRadius: 8,
-      backgroundColor: colors.searchBg,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    subjectChipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    subjectChipText: { fontSize: 13, fontWeight: '600' as const, color: colors.textSecondary },
-    subjectChipTextActive: { color: '#FFFFFF' },
+    filterRow: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    filterContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, flexDirection: 'row' as const },
+    chip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.searchBg, borderWidth: 1, borderColor: colors.border },
+    chipActive: { backgroundColor: colors.primaryDim, borderColor: colors.primary },
+    chipText: { fontSize: 13, fontWeight: '500' as const, color: colors.textSecondary },
+    chipTextActive: { color: colors.primary },
+    sortRow: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    sortContent: { paddingHorizontal: 16, paddingVertical: 6, gap: 6, flexDirection: 'row' as const },
+    sortChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, backgroundColor: colors.searchBg, borderWidth: 1, borderColor: colors.border },
+    sortChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    sortChipText: { fontSize: 12, fontWeight: '500' as const, color: colors.textSecondary },
+    sortChipTextActive: { color: '#FFFFFF', fontWeight: '600' as const },
+    searchBar: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    searchInput: { backgroundColor: colors.searchBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: colors.textPrimary },
     list: { paddingVertical: 8, paddingBottom: 24 },
     center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: 80 },
     errorText: { fontSize: 14, color: '#EF4444' },
     emptyText: { fontSize: 14, color: colors.textSecondary },
-    loadMoreBtn: {
-      marginHorizontal: 16,
-      marginVertical: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderRadius: 10,
-      alignItems: 'center' as const,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
+    loadMoreBtn: { marginHorizontal: 16, marginVertical: 16, paddingVertical: 12, backgroundColor: colors.surface, borderRadius: 10, alignItems: 'center' as const, borderWidth: 1, borderColor: colors.border },
     loadMoreText: { fontSize: 14, fontWeight: '600' as const, color: colors.primary },
   }), [colors]);
 
@@ -213,37 +179,31 @@ export default function JobsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>채용공고</Text>
-        <TouchableOpacity
-          onPress={() => router.push('/bookmarks/jobs')}
-          style={styles.bookmarkBtn}
-          accessibilityRole="button"
-          accessibilityLabel="채용공고 북마크 보기"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.bookmarkBtnIcon}>★</Text>
+        <TouchableOpacity onPress={() => router.push('/bookmarks/jobs')} style={styles.bookmarkBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="bookmark-outline" size={22} color={colors.bookmark} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.subjectRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.subjectContent}
-        >
-          {SUBJECT_FILTERS.map((s) => {
-            const active = selectedSubject === s.label;
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
+          {COMMON_TAGS.map((tag) => {
+            const active = selectedCategories.includes(tag.value);
             return (
-              <TouchableOpacity
-                key={s.label}
-                style={[styles.subjectChip, active && styles.subjectChipActive]}
-                onPress={() => toggleSubject(s.label)}
-                accessibilityRole="radio"
-                accessibilityLabel={s.label}
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={[styles.subjectChipText, active && styles.subjectChipTextActive]}>
-                  {s.label}
-                </Text>
+              <TouchableOpacity key={tag.value} style={[styles.chip, active && styles.chipActive]} onPress={() => toggleCategory(tag.value)}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{tag.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={styles.sortRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortContent}>
+          {SORT_OPTIONS.map((opt) => {
+            const active = sort === opt.value;
+            return (
+              <TouchableOpacity key={opt.value} style={[styles.sortChip, active && styles.sortChipActive]} onPress={() => setSort(opt.value)}>
+                <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>{opt.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -251,55 +211,11 @@ export default function JobsScreen() {
       </View>
 
       <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          value={query}
-          onChangeText={handleChangeText}
-          placeholder="회사명, 포지션, 기술스택 검색..."
-          placeholderTextColor={colors.textSecondary}
-          returnKeyType="search"
-          accessibilityLabel="채용공고 검색어 입력"
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
+        <TextInput style={styles.searchInput} value={query} onChangeText={handleChangeText} placeholder="회사명, 포지션, 기술스택 검색..." placeholderTextColor={colors.textSecondary} returnKeyType="search" autoCorrect={false} autoCapitalize="none" />
       </View>
 
-      <View style={styles.tagsWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tagsContent}
-        >
-          {JOB_TAGS.map((tag) => {
-            const active = selectedTags.includes(tag);
-            return (
-              <TouchableOpacity
-                key={tag}
-                style={[styles.tagChip, active && styles.tagChipActive]}
-                onPress={() => toggleTag(tag)}
-                accessibilityRole="checkbox"
-                accessibilityLabel={tag}
-                accessibilityState={{ checked: active }}
-              >
-                <Text style={[styles.tagChipText, active && styles.tagChipTextActive]}>
-                  {tag}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {isLoading && !refreshing && (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      )}
-      {isError && (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>콘텐츠를 불러올 수 없습니다.</Text>
-        </View>
-      )}
+      {isLoading && !refreshing && <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>}
+      {isError && <View style={styles.center}><Text style={styles.errorText}>콘텐츠를 불러올 수 없습니다.</Text></View>}
       {!isLoading && !isError && (
         <FlatList
           data={allItems}
@@ -307,28 +223,12 @@ export default function JobsScreen() {
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
           keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-          }
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>채용공고가 없습니다.</Text>
-            </View>
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+          ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyText}>채용공고가 없습니다.</Text></View>}
           ListFooterComponent={
             hasMore ? (
-              <TouchableOpacity
-                style={styles.loadMoreBtn}
-                onPress={loadMore}
-                disabled={isLoadingMore}
-                accessibilityRole="button"
-                accessibilityLabel="더보기"
-              >
-                {isLoadingMore ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={styles.loadMoreText}>더보기</Text>
-                )}
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={isLoadingMore}>
+                {isLoadingMore ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.loadMoreText}>더보기</Text>}
               </TouchableOpacity>
             ) : null
           }

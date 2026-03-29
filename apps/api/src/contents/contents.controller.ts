@@ -31,6 +31,7 @@ export class ContentsController {
       source_type: query.source_type,
       page: query.page,
       limit: query.limit,
+      sort: query.sort,
     });
   }
 

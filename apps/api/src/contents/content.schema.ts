@@ -39,6 +39,9 @@ export class Content {
   @Prop({ required: true })
   published_at: Date;
 
+  @Prop({ default: 0 })
+  like_count: number;
+
   @Prop({ default: false })
   es_indexed: boolean;
 

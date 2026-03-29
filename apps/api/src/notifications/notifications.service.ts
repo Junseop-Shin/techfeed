@@ -22,7 +22,6 @@ export class NotificationsService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Pub/Sub subscriber requires a dedicated connection — duplicate() preserves config
     this.subscriber = this.redisProvider.client.duplicate();
 
     this.subscriber.subscribe('new_content', (err) => {
@@ -42,6 +41,19 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
+  // Redis key for per-user badge count
+  private badgeKey(userId: string): string {
+    return `badge:${userId}`;
+  }
+
+  async incrementBadge(userId: string): Promise<number> {
+    return this.redisProvider.client.incr(this.badgeKey(userId));
+  }
+
+  async resetBadge(userId: string): Promise<void> {
+    await this.redisProvider.client.set(this.badgeKey(userId), 0);
+  }
+
   private async handleNewContent(message: string): Promise<void> {
     let event: NewContentEvent;
     try {
@@ -52,8 +64,9 @@ export class NotificationsService implements OnModuleInit {
     }
 
     const { contentId, title, tags } = event;
-    const recipientMap = new Map<string, string>(); // userId -> fcm_token
 
+    // Collect unique users subscribed to matching tags
+    const recipientMap = new Map<string, string>(); // userId -> fcm_token
     for (const tag of tags) {
       const users = await this.usersService.findByTag(tag);
       for (const user of users) {
@@ -63,16 +76,26 @@ export class NotificationsService implements OnModuleInit {
       }
     }
 
-    const tokens = Array.from(recipientMap.values());
-    if (tokens.length === 0) return;
+    if (recipientMap.size === 0) return;
 
-    await this.pushService.sendMulticast(
-      tokens,
-      '새 글이 올라왔어요',
-      title,
-      { contentId },
-    );
+    // Send individually so each user gets their own badge count
+    let successCount = 0;
+    for (const [userId, token] of recipientMap) {
+      try {
+        const badge = await this.incrementBadge(userId);
+        await this.pushService.send(
+          token,
+          '새 글이 올라왔어요',
+          title,
+          { contentId },
+          badge,
+        );
+        successCount++;
+      } catch (err) {
+        this.logger.warn(`Push failed for user ${userId}: ${err}`);
+      }
+    }
 
-    this.logger.log(`Push sent to ${tokens.length} users for content ${contentId}`);
+    this.logger.log(`Push sent to ${successCount} users for content ${contentId}`);
   }
 }

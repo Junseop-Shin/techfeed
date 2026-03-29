@@ -14,6 +14,10 @@ import { MetricsModule } from './metrics/metrics.module';
 import { MetricsMiddleware } from './metrics/metrics.middleware';
 import { CommentsModule } from './comments/comments.module';
 import { TagsModule } from './tags/tags.module';
+import { SourcesModule } from './sources/sources.module';
+import { LikesModule } from './likes/likes.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { UserSourcesModule } from './user-sources/user-sources.module';
 
 @Module({
   imports: [
@@ -46,6 +50,10 @@ import { TagsModule } from './tags/tags.module';
     MetricsModule,
     CommentsModule,
     TagsModule,
+    SourcesModule,
+    LikesModule,
+    ReviewsModule,
+    UserSourcesModule,
   ],
 })
 export class AppModule implements NestModule {

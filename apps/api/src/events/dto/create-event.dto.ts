@@ -1,6 +1,5 @@
 import {
   IsEnum,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsInt,
@@ -9,14 +8,30 @@ import {
   MaxLength,
 } from 'class-validator';
 
+export type EventType =
+  | 'read' | 'click' | 'bookmark' | 'share' | 'like'
+  | 'login' | 'signup' | 'push_enable' | 'push_disable'
+  | 'review' | 'tab_visit' | 'search' | 'filter_apply'
+  | 'app_open' | 'login_prompt_seen';
+
 export class CreateEventDto {
-  @IsEnum(['read', 'click', 'bookmark', 'share'])
-  event_type: 'read' | 'click' | 'bookmark' | 'share';
+  @IsEnum([
+    'read', 'click', 'bookmark', 'share', 'like',
+    'login', 'signup', 'push_enable', 'push_disable',
+    'review', 'tab_visit', 'search', 'filter_apply',
+    'app_open', 'login_prompt_seen',
+  ])
+  event_type: EventType;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(100)
-  content_id: string;
+  content_id?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  device_id?: string;
 
   @IsString()
   @IsOptional()

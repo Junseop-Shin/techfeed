@@ -5,6 +5,7 @@ import { BlogCrawler } from './crawlers/blog.crawler';
 import { YouTubeCrawler } from './crawlers/youtube.crawler';
 import { JobCrawler } from './crawlers/job.crawler';
 import { JumpitCrawler } from './crawlers/jumpit.crawler';
+import { CrawlerSourceModel } from './models/source.model';
 
 const QUEUE_NAME = 'crawl';
 const CRAWL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
@@ -29,8 +30,11 @@ export async function startQueue(): Promise<void> {
     async (job: Job) => {
       console.log(`[Queue] Running job: ${job.name}`);
 
-      const blog = new BlogCrawler(esClient, redis);
-      const youtube = new YouTubeCrawler(esClient, redis);
+      // Load sources from DB on each crawl cycle
+      const dbSources = await CrawlerSourceModel.find({ enabled: true }).lean();
+
+      const blog = new BlogCrawler(esClient, redis, dbSources as any);
+      const youtube = new YouTubeCrawler(esClient, redis, dbSources as any);
       const jobs = new JobCrawler(esClient, redis);
       const jumpit = new JumpitCrawler(esClient, redis);
 

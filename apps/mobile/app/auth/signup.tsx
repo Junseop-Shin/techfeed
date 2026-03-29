@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSignup } from '../../src/hooks/useAuth';
+import { trackEvent } from '../../src/api/analytics';
 
 export default function SignupScreen() {
   const [name, setName] = useState('');
@@ -35,6 +36,7 @@ export default function SignupScreen() {
       { name, email, password },
       {
         onSuccess: () => {
+          trackEvent([{ event_type: 'signup' }]);
           router.dismiss();
         },
         onError: () => {

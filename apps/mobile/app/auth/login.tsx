@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useLogin, useGoogleLogin } from '../../src/hooks/useAuth';
+import { trackEvent } from '../../src/api/analytics';
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
@@ -35,7 +36,10 @@ export default function LoginScreen() {
     doLogin(
       { email, password },
       {
-        onSuccess: () => router.dismiss(),
+        onSuccess: () => {
+          trackEvent([{ event_type: 'login', metadata: { method: 'email' } }]);
+          router.dismiss();
+        },
         onError: () => Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인해주세요.'),
       }
     );
@@ -48,7 +52,10 @@ export default function LoginScreen() {
       const tokens = await GoogleSignin.getTokens();
 
       doGoogleLogin(tokens.accessToken, {
-        onSuccess: () => router.dismiss(),
+        onSuccess: () => {
+          trackEvent([{ event_type: 'login', metadata: { method: 'google' } }]);
+          router.dismiss();
+        },
         onError: () => Alert.alert('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.'),
       });
     } catch (error: any) {

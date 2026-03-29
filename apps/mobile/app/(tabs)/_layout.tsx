@@ -1,6 +1,6 @@
 import React from 'react';
-import { Text } from 'react-native';
 import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeStore } from '../../src/store/theme.store';
 
 export default function TabsLayout() {
@@ -24,8 +24,8 @@ export default function TabsLayout() {
         options={{
           title: '홈',
           tabBarLabel: '홈',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="home" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -34,8 +34,8 @@ export default function TabsLayout() {
         options={{
           title: '블로그',
           tabBarLabel: '블로그',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="blog" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -45,7 +45,7 @@ export default function TabsLayout() {
           title: 'YouTube',
           tabBarLabel: 'YouTube',
           tabBarIcon: ({ color }) => (
-            <TabIcon name="youtube" color={color} />
+            <Ionicons name="logo-youtube" size={22} color={color} />
           ),
         }}
       />
@@ -53,41 +53,26 @@ export default function TabsLayout() {
         name="jobs"
         options={{
           title: '채용공고',
-          tabBarLabel: '채용공고',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="jobs" color={color} />
+          tabBarLabel: '채용',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'briefcase' : 'briefcase-outline'} size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: '전체',
-          tabBarLabel: '전체',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="settings" color={color} />
+          title: '설정',
+          tabBarLabel: '설정',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={22} color={color} />
           ),
         }}
       />
-      {/* Hidden tabs — kept for redirect compatibility */}
+      {/* Hidden tabs */}
       <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen name="search" options={{ href: null }} />
       <Tabs.Screen name="bookmarks" options={{ href: null }} />
     </Tabs>
-  );
-}
-
-function TabIcon({ name, color }: { name: string; color: string }) {
-  const icons: Record<string, string> = {
-    home: '⌂',
-    blog: '✏',
-    youtube: '▶',
-    jobs: '💼',
-    settings: '☰',
-  };
-  return (
-    <Text style={{ fontSize: 20, color, lineHeight: 24 }}>
-      {icons[name] ?? '●'}
-    </Text>
   );
 }
