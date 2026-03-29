@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -15,7 +15,7 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
 
 @Injectable()
-export class ContentsService {
+export class ContentsService implements OnModuleInit {
   private readonly gemini: GoogleGenerativeAI | null;
   private readonly logger = new Logger(ContentsService.name);
 
@@ -29,6 +29,37 @@ export class ContentsService {
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     this.gemini = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+  }
+
+  async onModuleInit() {
+    if (this.searchService.reindexRequired) {
+      await this.reindexAll();
+    }
+  }
+
+  private async reindexAll(): Promise<void> {
+    this.logger.log('Re-indexing all contents into Elasticsearch...');
+    const contents = await this.contentModel.find().lean().exec();
+    let count = 0;
+    for (const c of contents) {
+      try {
+        await this.searchService.indexContent(String(c._id), {
+          title: c.title,
+          summary: c.summary,
+          url: c.url,
+          source_type: c.source_type,
+          source_name: c.source_name,
+          tags: c.tags,
+          thumbnail: c.thumbnail_url,
+          published_at: c.published_at,
+          view_count: c.view_count ?? 0,
+        });
+        count++;
+      } catch (err) {
+        this.logger.warn(`Failed to index content ${c._id}: ${err}`);
+      }
+    }
+    this.logger.log(`Re-indexed ${count}/${contents.length} contents`);
   }
 
   async search(opts: SearchContentsOptions & { sort?: string }) {

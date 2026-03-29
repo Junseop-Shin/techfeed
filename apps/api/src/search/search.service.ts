@@ -6,6 +6,9 @@ import {
 import { ElasticsearchService } from './elasticsearch.provider';
 
 const INDEX_NAME = 'contents';
+// Bump this version to force index recreation with new settings
+const INDEX_VERSION = 2;
+const INDEX_VERSION_ALIAS = `${INDEX_NAME}_meta`;
 
 export interface SearchContentsOptions {
   q?: string;
@@ -19,49 +22,90 @@ export interface SearchContentsOptions {
 @Injectable()
 export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
+  private needsReindex = false;
 
   constructor(private readonly es: ElasticsearchService) {}
 
   async onModuleInit() {
-    await this.ensureIndex();
+    this.needsReindex = await this.ensureIndex();
   }
 
-  private async ensureIndex() {
+  get reindexRequired(): boolean {
+    return this.needsReindex;
+  }
+
+  // Returns true if index was (re)created and needs re-indexing
+  private async ensureIndex(): Promise<boolean> {
     const exists = await this.es.client.indices.exists({ index: INDEX_NAME });
-    if (!exists) {
-      await this.es.client.indices.create({
-        index: INDEX_NAME,
-        mappings: {
-          properties: {
-            title: { type: 'text', analyzer: 'english' },
-            summary: { type: 'text' },
-            url: { type: 'keyword' },
-            source_type: { type: 'keyword' },
-            source_name: { type: 'keyword' },
-            tags: { type: 'keyword' },
-            thumbnail: { type: 'keyword' },
-            published_at: { type: 'date' },
-            view_count: { type: 'integer' },
+
+    if (exists) {
+      // Check if current index has edge_ngram analyzer (version marker)
+      try {
+        const settings = await this.es.client.indices.getSettings({ index: INDEX_NAME });
+        const analysis = (settings[INDEX_NAME] as any)?.settings?.index?.analysis;
+        const hasEdgeNgram = analysis?.tokenizer?.edge_ngram_tokenizer != null;
+        if (hasEdgeNgram) {
+          this.logger.log(`Elasticsearch index "${INDEX_NAME}" already exists (v${INDEX_VERSION})`);
+          return false;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Old index without edge_ngram — delete and recreate
+      this.logger.log(`Elasticsearch index "${INDEX_NAME}" outdated, recreating with edge_ngram...`);
+      await this.es.client.indices.delete({ index: INDEX_NAME });
+    }
+
+    await this.es.client.indices.create({
+      index: INDEX_NAME,
+      settings: {
+        analysis: {
+          tokenizer: {
+            edge_ngram_tokenizer: {
+              type: 'edge_ngram',
+              min_gram: 1,
+              max_gram: 20,
+              token_chars: ['letter', 'digit'],
+            },
+          },
+          analyzer: {
+            edge_ngram_analyzer: {
+              type: 'custom',
+              tokenizer: 'edge_ngram_tokenizer',
+              filter: ['lowercase'],
+            },
           },
         },
-      });
-      this.logger.log(`Elasticsearch index "${INDEX_NAME}" created`);
-    } else {
-      this.logger.log(`Elasticsearch index "${INDEX_NAME}" already exists`);
-    }
+      } as any,
+      mappings: {
+        properties: {
+          title: { type: 'text', analyzer: 'edge_ngram_analyzer', search_analyzer: 'standard' } as any,
+          summary: { type: 'text', analyzer: 'edge_ngram_analyzer', search_analyzer: 'standard' } as any,
+          url: { type: 'keyword' },
+          source_type: { type: 'keyword' },
+          source_name: { type: 'keyword' },
+          tags: { type: 'keyword' },
+          thumbnail: { type: 'keyword' },
+          published_at: { type: 'date' },
+          view_count: { type: 'integer' },
+        },
+      },
+    });
+
+    this.logger.log(`Elasticsearch index "${INDEX_NAME}" created with edge_ngram analyzer`);
+    return true;
   }
 
   async autocomplete(q: string): Promise<string[]> {
-    if (!q || q.length < 2) return [];
+    if (!q || q.length < 1) return [];
 
     const result = await this.es.client.search({
       index: INDEX_NAME,
       size: 10,
       query: {
-        multi_match: {
-          query: q,
-          fields: ['title'],
-          type: 'phrase_prefix',
+        match: {
+          title: { query: q, operator: 'and' },
         },
       },
       _source: ['title'],
@@ -89,8 +133,8 @@ export class SearchService implements OnModuleInit {
       must.push({
         multi_match: {
           query: q,
-          fields: ['title', 'summary'],
-          type: 'phrase_prefix',
+          fields: ['title^2', 'summary'],
+          operator: 'and',
         },
       });
     }
