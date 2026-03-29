@@ -63,7 +63,12 @@ function BookmarkButton({ contentId, sourceType }: { contentId: string; sourceTy
     } else {
       addBookmarkWithType(contentId, sourceType, 'interested')
         .then(invalidate)
-        .catch(() => Alert.alert('오류', '북마크 저장에 실패했습니다.'));
+        .catch((err: any) => {
+          const msg = err?.response?.status === 403
+            ? (err?.response?.data?.message ?? '북마크 한도에 도달했습니다.')
+            : '북마크 저장에 실패했습니다.';
+          Alert.alert('북마크 한도 초과', msg);
+        });
     }
   };
 
@@ -132,12 +137,19 @@ function BlogCard({ content }: { content: Content }) {
   const hasThumbnail = !!content.thumbnail_url;
   const [showSummary, setShowSummary] = useState(false);
 
-  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+  const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: ['summary', content.id],
     queryFn: () => getContentSummary(content.id),
     enabled: showSummary,
     staleTime: 1000 * 60 * 60 * 24,
+    retry: false,
   });
+
+  const summaryErrorMsg = summaryError
+    ? ((summaryError as any)?.response?.status === 403
+        ? (summaryError as any)?.response?.data?.message ?? '일일 AI 요약 한도에 도달했습니다.'
+        : '요약을 불러올 수 없습니다.')
+    : null;
 
   const styles = useMemo(() => StyleSheet.create({
     sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
@@ -198,6 +210,8 @@ function BlogCard({ content }: { content: Content }) {
           <View style={styles.summaryBox}>
             {summaryLoading ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
+            ) : summaryErrorMsg ? (
+              <Text style={styles.summaryEmpty}>{summaryErrorMsg}</Text>
             ) : summaryData?.summary ? (
               <Text style={styles.summaryText}>{summaryData.summary}</Text>
             ) : (
@@ -221,12 +235,19 @@ function YoutubeCard({ content }: { content: Content }) {
   const colors = useThemeStore((s) => s.colors);
   const [showSummary, setShowSummary] = useState(false);
 
-  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+  const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: ['summary', content.id],
     queryFn: () => getContentSummary(content.id),
     enabled: showSummary,
     staleTime: 1000 * 60 * 60 * 24,
+    retry: false,
   });
+
+  const summaryErrorMsg = summaryError
+    ? ((summaryError as any)?.response?.status === 403
+        ? (summaryError as any)?.response?.data?.message ?? '일일 AI 요약 한도에 도달했습니다.'
+        : '요약을 불러올 수 없습니다.')
+    : null;
 
   const styles = useMemo(() => StyleSheet.create({
     sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
@@ -267,6 +288,8 @@ function YoutubeCard({ content }: { content: Content }) {
         <View style={styles.summaryBox}>
           {summaryLoading ? (
             <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
+          ) : summaryErrorMsg ? (
+            <Text style={styles.summaryEmpty}>{summaryErrorMsg}</Text>
           ) : summaryData?.summary ? (
             <Text style={styles.summaryText}>{summaryData.summary}</Text>
           ) : (

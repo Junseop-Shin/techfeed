@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectModel } from '@nestjs/mongoose';
 import { Repository } from 'typeorm';
@@ -16,6 +16,9 @@ const DEFAULT_STATUS: Record<string, string> = {
   youtube: 'interested',
   job: 'interested',
 };
+
+const BOOKMARK_LIMIT = 50;
+const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
 @Injectable()
 export class BookmarksService {
@@ -63,7 +66,18 @@ export class BookmarksService {
     });
   }
 
-  async add(userId: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
+  async add(userId: string, email: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
+    if (!PREMIUM_EMAILS.has(email) && contentType) {
+      const count = await this.repo.count({
+        where: { user: { id: userId }, content_type: contentType },
+      });
+      if (count >= BOOKMARK_LIMIT) {
+        throw new ForbiddenException(
+          `${contentType} 북마크 한도(${BOOKMARK_LIMIT}개)에 도달했습니다. 프리미엄으로 업그레이드하면 무제한으로 저장할 수 있습니다.`,
+        );
+      }
+    }
+
     const status = statusOverride ?? (contentType ? (DEFAULT_STATUS[contentType] ?? null) : null);
     try {
       const bookmark = this.repo.create({

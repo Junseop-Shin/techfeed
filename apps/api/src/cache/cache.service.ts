@@ -52,6 +52,19 @@ export class CacheService {
     await this.redis.client.set(key, value, 'EX', ttlSeconds);
   }
 
+  async getRateLimitCount(key: string): Promise<number> {
+    const val = await this.redis.client.get(key);
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  async incrementRateLimit(key: string, ttlSeconds: number): Promise<number> {
+    const count = await this.redis.client.incr(key);
+    if (count === 1) {
+      await this.redis.client.expire(key, ttlSeconds);
+    }
+    return count;
+  }
+
   async invalidateFeedCache(sourceType?: string): Promise<void> {
     const keys = sourceType
       ? [`feed:${sourceType}`]

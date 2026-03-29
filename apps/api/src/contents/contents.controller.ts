@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Ip,
   Param,
   Query,
   BadRequestException,
@@ -85,9 +86,15 @@ export class ContentsController {
    * GET /contents/:id/summary
    * Returns AI-generated summary for YouTube content.
    * Result is cached in Redis (7 days) and persisted in MongoDB.
+   * Rate limited: 5/day (anonymous), 20/day (logged-in), unlimited (premium).
    */
   @Get(':id/summary')
-  async getSummary(@Param('id') id: string) {
-    return this.contentsService.getSummary(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  async getSummary(
+    @Param('id') id: string,
+    @Request() req: { user?: { userId: string; email: string } },
+    @Ip() ip: string,
+  ) {
+    return this.contentsService.getSummary(id, req.user ?? null, ip);
   }
 }

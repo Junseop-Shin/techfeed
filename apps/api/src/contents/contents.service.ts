@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -13,6 +13,8 @@ import { CacheService } from '../cache/cache.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
+const RATE_LIMIT_TTL = 60 * 60 * 24; // 24시간
+const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
 @Injectable()
 export class ContentsService implements OnModuleInit {
@@ -166,14 +168,36 @@ export class ContentsService implements OnModuleInit {
     return this.searchService.autocomplete(q);
   }
 
-  async getSummary(id: string): Promise<{ summary: string }> {
+  async getSummary(
+    id: string,
+    user: { userId: string; email: string } | null,
+    ip: string,
+  ): Promise<{ summary: string }> {
     const cacheKey = `summary:${id}`;
 
-    // 1. Redis 캐시 확인
+    // 1. Redis 캐시 확인 (캐시 히트는 한도 차감 없음)
     const cached = await this.cacheService.get(cacheKey);
     if (cached) return { summary: cached };
 
-    // 2. MongoDB의 기존 ai_summary 확인
+    // 2. Rate limit 체크
+    const isPremium = user ? PREMIUM_EMAILS.has(user.email) : false;
+    if (!isPremium) {
+      const rateLimitKey = user
+        ? `ratelimit:summary:user:${user.userId}`
+        : `ratelimit:summary:ip:${ip}`;
+      const limit = user ? 20 : 5;
+      const count = await this.cacheService.getRateLimitCount(rateLimitKey);
+      if (count >= limit) {
+        throw new ForbiddenException(
+          user
+            ? `일일 AI 요약 한도(${limit}회)에 도달했습니다. 내일 다시 시도해주세요.`
+            : `비로그인 일일 AI 요약 한도(${limit}회)에 도달했습니다. 로그인하면 더 많이 사용할 수 있습니다.`,
+        );
+      }
+      await this.cacheService.incrementRateLimit(rateLimitKey, RATE_LIMIT_TTL);
+    }
+
+    // 3. MongoDB의 기존 ai_summary 확인
     const content = await this.contentModel.findById(id).lean().exec();
     if (!content) throw new NotFoundException(`Content ${id} not found`);
 
@@ -182,7 +206,7 @@ export class ContentsService implements OnModuleInit {
       return { summary: content.ai_summary };
     }
 
-    // 3. Gemini API 호출
+    // 4. Gemini API 호출
     if (!this.gemini) {
       throw new BadRequestException('AI summary is not configured');
     }
@@ -202,7 +226,7 @@ ${contentBody ? `내용: ${contentBody.slice(0, 3000)}` : ''}
     const result = await model.generateContent(prompt);
     const summary = result.response.text().trim();
 
-    // 4. MongoDB + Redis 저장
+    // 5. MongoDB + Redis 저장
     await this.contentModel.findByIdAndUpdate(id, { ai_summary: summary });
     await this.cacheService.set(cacheKey, summary, SUMMARY_CACHE_TTL);
 
