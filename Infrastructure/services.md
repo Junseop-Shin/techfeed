@@ -84,6 +84,31 @@ Web 서비스 외부 노출용. SSH는 제외 (DDNS 직접 접근).
 
 ---
 
+## Mac Mini — DevOps Monitor
+
+로컬 모니터링 스택 (Mac Mini에서 Docker Compose 실행).
+
+**Deploy path:** `~/Documents/Work/Projects/devops-monitor`
+
+| Container | 역할 | Port |
+|-----------|------|------|
+| `grafana` | 대시보드 UI | `3000` |
+| `prometheus` | 메트릭 수집 | `9090` |
+| `loki` | 로그 집계 | `3100` |
+| `alertmanager` | 알림 라우팅 | `9093` |
+
+**Slack 연동:**
+
+| Item | Value |
+|------|-------|
+| Bot Token | `devops-monitor/.env` → `SLACK_BOT_TOKEN` |
+| Webhook URL | `devops-monitor/.env` → `SLACK_WEBHOOK_URL` |
+| 알림 채널 | `#새-워크스페이스-전체` (`C0AGQNN4Q2D`) |
+
+APK 빌드 결과, Grafana 알림 등 모두 이 채널로 전송.
+
+---
+
 ## TechFeed Docker Services
 
 GitHub Actions (`deploy.yml`) — `main` push 또는 수동 실행 시 자동 배포.

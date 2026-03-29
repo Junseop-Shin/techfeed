@@ -13,7 +13,7 @@
 - **랭킹** — Redis Sorted Set 기반 시간 감쇠 트렌딩
 - **댓글** — 콘텐츠 상세 화면에서 댓글 작성/삭제
 - **북마크** — 관심 콘텐츠 저장
-- **푸시 알림** — 구독 태그에 새 콘텐츠 등록 시 FCM 즉시 푸시
+- **푸시 알림** — 구독 태그에 새 콘텐츠 등록 시 FCM 배치 푸시 (2분 디바운스, 소스 유형별 합산 요약)
 - **구독 태그** — DB 기반 태그 목록 (`GET /tags`) — 앱 재빌드 없이 태그 추가/제거 가능
 - **이벤트 분석** — TimescaleDB 기반 유저 행동 시계열 저장
 - **테마** — 다크 / 라이트 모드 지원
@@ -93,6 +93,17 @@ cd apps/mobile
 npm install
 npx expo start
 ```
+
+### 6. Android APK 빌드 (로컬)
+
+```bash
+cd apps/mobile
+bash build-apk.sh
+```
+
+빌드 완료 후 Slack `#새-워크스페이스-전체` 채널로 APK 자동 전송.
+
+> 사전 요구사항: Android Studio (JAVA_HOME), Android SDK (ANDROID_HOME), Slack Bot Token (`devops-monitor/.env` 내 `SLACK_BOT_TOKEN`)
 
 ---
 
@@ -181,6 +192,10 @@ npx expo start
 | 드림코딩 | webdev, javascript |
 | 우아한Tech | baemin, backend |
 | NAVER D2 | naver |
+| 제로초TV | javascript, webdev, nodejs |
+| 코드팩토리 | flutter, dart, mobile, webdev |
+| 코딩하는기술사 | backend, architecture |
+| 조코딩 | webdev, javascript, python |
 
 ### 채용공고
 | 소스 | 방식 |
@@ -190,7 +205,7 @@ npx expo start
 
 > 동일 공고 중복 방지: `sha256(회사명 + 직무명)` 기반 `position_hash` 중복 체크
 
-소스 추가: `apps/crawler/src/config.ts`의 `blogSources`, `youtubeSources`, `jobSources` 배열에 추가.
+소스 추가: MongoDB `crawlersources` 컬렉션에 직접 insert하거나 `apps/crawler/src/config.ts`의 `blogSources`, `youtubeSources`, `jobSources` 배열에 추가.
 
 ---
 
