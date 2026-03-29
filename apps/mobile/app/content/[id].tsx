@@ -10,13 +10,22 @@ import {
   Share,
   Alert,
 } from 'react-native';
+
+const JOB_STATUS_OPTIONS = [
+  { value: 'interested', label: '관심', color: '#6B7280' },
+  { value: 'to_apply', label: '지원예정', color: '#3B82F6' },
+  { value: 'applied', label: '지원완료', color: '#3B82F6' },
+  { value: 'interviewing', label: '면접중', color: '#F97316' },
+  { value: 'rejected', label: '탈락', color: '#EF4444' },
+  { value: 'accepted', label: '최종합격', color: '#22C55E' },
+];
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
 import { trackEvent, toggleLike, getLikeStatus } from '../../src/api/contents';
 import { addBookmarkWithType, removeBookmark, updateBookmarkStatus } from '../../src/api/users';
-import { useBookmarks } from '../../src/hooks/useBookmark';
+import { useBookmarks, useBookmarkStatus, useUpdateBookmarkStatus } from '../../src/hooks/useBookmark';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useQueryClient } from '@tanstack/react-query';
@@ -59,6 +68,10 @@ export default function ContentDetailScreen() {
   }, [token, id]);
 
   const isBookmarked = bookmarkIds?.has(id ?? '') ?? false;
+  const { data: bookmarkStatus } = useBookmarkStatus(id ?? '');
+  const { mutate: updateJobStatus } = useUpdateBookmarkStatus();
+  const contentType = (content as any)?.source_type ?? (content as any)?.type;
+  const isJob = contentType === 'job';
 
   const handleBookmark = useCallback(() => {
     if (!token || !id || !content) return;
@@ -67,11 +80,11 @@ export default function ContentDetailScreen() {
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
         .catch(() => Alert.alert('오류', '북마크 취소에 실패했습니다.'));
     } else {
-      addBookmarkWithType(id, (content as any).source_type ?? (content as any).type, 'done')
+      addBookmarkWithType(id, (content as any).source_type ?? (content as any).type, isJob ? 'interested' : 'done')
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
         .catch(() => Alert.alert('오류', '북마크 저장에 실패했습니다.'));
     }
-  }, [token, id, content, isBookmarked, queryClient]);
+  }, [token, id, content, isBookmarked, isJob, queryClient]);
 
   const handleShare = useCallback(async () => {
     if (!content) return;
@@ -202,14 +215,16 @@ export default function ContentDetailScreen() {
               style={styles.actionBtn}
               onPress={handleBookmark}
               accessibilityRole="button"
-              accessibilityLabel={isBookmarked ? '완독으로 북마크' : '완독 북마크 추가'}
+              accessibilityLabel={isBookmarked ? '북마크 취소' : '북마크 추가'}
             >
               <Ionicons
                 name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
                 size={22}
                 color={isBookmarked ? colors.bookmark : colors.textSecondary}
               />
-              <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>완독</Text>
+              <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>
+                {isJob ? '관심' : '완독'}
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -223,6 +238,34 @@ export default function ContentDetailScreen() {
             <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>공유</Text>
           </TouchableOpacity>
         </View>
+
+        {isJob && isBookmarked && (
+          <View style={[styles.jobStatusRow, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.jobStatusLabel, { color: colors.textSecondary }]}>지원 상태</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.jobStatusChips}>
+              {JOB_STATUS_OPTIONS.map((opt) => {
+                const isActive = bookmarkStatus === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.jobStatusChip,
+                      { borderColor: opt.color },
+                      isActive && { backgroundColor: opt.color },
+                    ]}
+                    onPress={() => updateJobStatus({ contentId: id!, status: opt.value })}
+                    accessibilityRole="button"
+                    accessibilityLabel={opt.label}
+                  >
+                    <Text style={[styles.jobStatusChipText, { color: isActive ? '#FFFFFF' : opt.color }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -295,4 +338,18 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 15, marginBottom: 16 },
   backButton: { paddingHorizontal: 20, paddingVertical: 10 },
   backButtonText: { fontSize: 14 },
+  jobStatusRow: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  jobStatusLabel: { fontSize: 12, fontWeight: '600', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  jobStatusChips: { gap: 8, paddingRight: 4 },
+  jobStatusChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  jobStatusChipText: { fontSize: 13, fontWeight: '600' },
 });

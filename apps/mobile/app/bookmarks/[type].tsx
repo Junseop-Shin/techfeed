@@ -171,7 +171,7 @@ function BookmarkItemRow({ item, statusTabs, onStatusChange, colors }: BookmarkI
       accessibilityLabel="북마크 아이템, 탭하면 상세보기, 길게 눌러 상태 변경"
     >
       {item.content ? (
-        <ContentCard content={item.content} />
+        <ContentCard content={item.content} bookmarkStatus={item.status} />
       ) : (
         <View style={styles.fallbackRow}>
           <Text style={styles.fallbackId} numberOfLines={1}>

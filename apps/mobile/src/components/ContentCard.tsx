@@ -23,7 +23,16 @@ import { trackEvent } from '../api/analytics';
 interface ContentCardProps {
   content: Content;
   isNew?: boolean;
+  bookmarkStatus?: string | null;
 }
+
+const JOB_STATUS_COLORS: Record<string, string> = {
+  to_apply: '#3B82F6',
+  applied: '#3B82F6',
+  interviewing: '#F97316',
+  rejected: '#EF4444',
+  accepted: '#22C55E',
+};
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -314,8 +323,10 @@ function JobCard({ content }: { content: Content }) {
   );
 }
 
-export function ContentCard({ content, isNew }: ContentCardProps) {
+export function ContentCard({ content, isNew, bookmarkStatus }: ContentCardProps) {
   const colors = useThemeStore((s) => s.colors);
+  const contentType = content.source_type ?? (content as any).type;
+  const statusBorderColor = bookmarkStatus ? JOB_STATUS_COLORS[bookmarkStatus] : undefined;
 
   return (
     <TouchableOpacity
@@ -323,6 +334,7 @@ export function ContentCard({ content, isNew }: ContentCardProps) {
         cardStyles.card,
         { backgroundColor: colors.surface },
         isNew && { borderWidth: 2, borderColor: colors.primary },
+        statusBorderColor && { borderWidth: 2, borderColor: statusBorderColor },
       ]}
       onPress={() => router.push(`/content/${content.id}`)}
       accessibilityRole="button"
@@ -333,9 +345,9 @@ export function ContentCard({ content, isNew }: ContentCardProps) {
           <Text style={cardStyles.newBadgeText}>NEW</Text>
         </View>
       )}
-      {content.source_type === 'blog' && <BlogCard content={content} />}
-      {content.source_type === 'youtube' && <YoutubeCard content={content} />}
-      {content.source_type === 'job' && <JobCard content={content} />}
+      {contentType === 'blog' && <BlogCard content={content} />}
+      {contentType === 'youtube' && <YoutubeCard content={content} />}
+      {contentType === 'job' && <JobCard content={content} />}
     </TouchableOpacity>
   );
 }
