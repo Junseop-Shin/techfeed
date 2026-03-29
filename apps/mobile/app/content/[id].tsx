@@ -14,8 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
-import { trackEvent, toggleLike } from '../../src/api/contents';
-import { addBookmarkWithType, updateBookmarkStatus } from '../../src/api/users';
+import { trackEvent, toggleLike, getLikeStatus } from '../../src/api/contents';
+import { addBookmarkWithType, removeBookmark } from '../../src/api/users';
 import { useBookmarks } from '../../src/hooks/useBookmark';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';
@@ -46,21 +46,26 @@ export default function ContentDetailScreen() {
     };
   }, [id]);
 
-  // Initialize like count from content data
+  // Initialize like count from content data + fetch liked state
   useEffect(() => {
     if (content && likeCount === null) {
       setLikeCount((content as any).like_count ?? 0);
     }
   }, [content, likeCount]);
 
+  useEffect(() => {
+    if (!token || !id) return;
+    getLikeStatus(id).then((r) => setIsLiked(r.liked)).catch(() => {});
+  }, [token, id]);
+
   const isBookmarked = bookmarkIds?.has(id ?? '') ?? false;
 
   const handleBookmark = useCallback(() => {
     if (!token || !id || !content) return;
     if (isBookmarked) {
-      updateBookmarkStatus(id, 'done')
+      removeBookmark(id)
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))
-        .catch(() => Alert.alert('오류', '북마크 업데이트에 실패했습니다.'));
+        .catch(() => Alert.alert('오류', '북마크 취소에 실패했습니다.'));
     } else {
       addBookmarkWithType(id, content.source_type, 'done')
         .then(() => queryClient.invalidateQueries({ queryKey: ['bookmarks'] }))

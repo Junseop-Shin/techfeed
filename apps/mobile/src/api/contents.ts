@@ -55,6 +55,9 @@ export const getContentSummary = (id: string): Promise<{ summary: string }> =>
 export const getRecommended = (): Promise<ContentsResponse> =>
   apiClient.get('/contents/recommended').then((r) => r.data);
 
+export const getLikeStatus = (contentId: string): Promise<{ liked: boolean }> =>
+  apiClient.get(`/contents/${contentId}/like`).then((r) => r.data);
+
 export const toggleLike = (contentId: string): Promise<{ liked: boolean; like_count: number }> =>
   apiClient.post(`/contents/${contentId}/like`).then((r) => r.data);
 

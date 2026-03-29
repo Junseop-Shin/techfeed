@@ -50,6 +50,11 @@ export class ContentsService {
       return result;
     }
 
+    if (opts.sort === 'views') {
+      result.items.sort((a: any, b: any) => (b.view_count ?? 0) - (a.view_count ?? 0));
+      return result;
+    }
+
     await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
     return result;
   }

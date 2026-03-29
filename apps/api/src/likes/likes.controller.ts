@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LikesService } from './likes.service';
 
@@ -6,6 +6,15 @@ import { LikesService } from './likes.service';
 @UseGuards(JwtAuthGuard)
 export class LikesController {
   constructor(private readonly likesService: LikesService) {}
+
+  @Get()
+  async getStatus(
+    @Param('contentId') contentId: string,
+    @Request() req: { user: { userId: string } },
+  ) {
+    const liked = await this.likesService.isLiked(req.user.userId, contentId);
+    return { liked };
+  }
 
   @Post()
   async toggle(
