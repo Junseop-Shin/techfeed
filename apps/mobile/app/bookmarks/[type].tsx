@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -200,11 +201,18 @@ export default function BookmarksTypeScreen() {
   const statusTabs = validType === 'jobs' ? JOB_STATUS_TABS : CONTENT_STATUS_TABS;
 
   const [selectedStatus, setSelectedStatus] = useState<string>(statusTabs[0].value);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: bookmarks, isLoading, isError, refetch } = useBookmarksByType(contentType);
   const { mutate: updateStatus } = useUpdateBookmarkStatus();
 
   const filteredBookmarks = bookmarks?.filter((b) => b.status === selectedStatus) ?? [];
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  }, [refetch]);
 
   const handleStatusChange = useCallback(
     (contentId: string, status: string) => {
@@ -431,6 +439,13 @@ export default function BookmarksTypeScreen() {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>해당 상태의 북마크가 없습니다.</Text>

@@ -159,7 +159,7 @@ export class ContentsService implements OnModuleInit {
 
     await this.cacheService.incrementViewCount(id);
 
-    return content;
+    return { id: String(content._id), ...content };
   }
 
   async autocomplete(q: string) {

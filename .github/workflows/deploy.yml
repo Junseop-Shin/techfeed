@@ -40,6 +40,7 @@ jobs:
           FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY="${{ secrets.FIREBASE_PRIVATE_KEY }}"
+          MONITOR_INGESTOR_URL=https://ingestor.nuclearbomb6518.com
           EOF
           ssh -i ~/.ssh/id_deploy \
             -p ${{ secrets.DEPLOY_PORT }} \

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useContentById } from '../../src/hooks/useContents';
 import { trackEvent, toggleLike, getLikeStatus } from '../../src/api/contents';
-import { addBookmarkWithType, removeBookmark } from '../../src/api/users';
+import { addBookmarkWithType, removeBookmark, updateBookmarkStatus } from '../../src/api/users';
 import { useBookmarks } from '../../src/hooks/useBookmark';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';

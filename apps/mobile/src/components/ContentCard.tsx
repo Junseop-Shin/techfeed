@@ -79,6 +79,7 @@ function BookmarkButton({ contentId, sourceType }: { contentId: string; sourceTy
 function LikeButton({ contentId, likeCount }: { contentId: string; likeCount?: number }) {
   const token = useAuthStore((s) => s.token);
   const colors = useThemeStore((s) => s.colors);
+  const queryClient = useQueryClient();
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(likeCount ?? 0);
 
@@ -88,11 +89,17 @@ function LikeButton({ contentId, likeCount }: { contentId: string; likeCount?: n
       Alert.alert('로그인 필요', '좋아요하려면 로그인이 필요합니다.');
       return;
     }
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setCount((c) => c + (newLiked ? 1 : -1));
     try {
       const result = await toggleLike(contentId);
       setLiked(result.liked);
       setCount(result.like_count);
+      queryClient.invalidateQueries({ queryKey: ['contents'] });
     } catch {
+      setLiked(!newLiked);
+      setCount((c) => c + (newLiked ? -1 : 1));
       Alert.alert('오류', '좋아요 처리에 실패했습니다.');
     }
   };

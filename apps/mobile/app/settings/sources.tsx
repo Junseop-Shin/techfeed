@@ -48,14 +48,22 @@ export default function SourcesScreen() {
     [userSources]
   );
 
+  // No explicit selections = all sources shown in feed
+  const allShown = followedIds.size === 0;
+
   const handleToggle = useCallback(async (source: Source) => {
     if (!token) {
-      Alert.alert('로그인 필요', '소스를 팔로우하려면 로그인이 필요합니다.');
+      Alert.alert('로그인 필요', '소스를 설정하려면 로그인이 필요합니다.');
       return;
     }
     setLoadingId(source._id);
     try {
-      if (followedIds.has(source._id)) {
+      if (allShown) {
+        // Transition from "show all" to selective mode:
+        // follow all other sources in this tab, leave this one hidden
+        const others = sources.filter((s) => s._id !== source._id);
+        await Promise.all(others.map((s) => followSource(s._id, s.type)));
+      } else if (followedIds.has(source._id)) {
         await unfollowSource(source._id);
       } else {
         await followSource(source._id, source.type);
@@ -66,22 +74,50 @@ export default function SourcesScreen() {
     } finally {
       setLoadingId(null);
     }
-  }, [token, followedIds, queryClient]);
+  }, [token, followedIds, allShown, sources, queryClient]);
+
+  const handleResetAll = useCallback(async () => {
+    if (followedIds.size === 0) return;
+    Alert.alert('전체 초기화', '모든 소스를 다시 표시하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '초기화', onPress: async () => {
+          try {
+            await Promise.all(userSources.map((s) => unfollowSource(s.source_id)));
+            await queryClient.invalidateQueries({ queryKey: ['userSources'] });
+          } catch {
+            Alert.alert('오류', '초기화에 실패했습니다.');
+          }
+        },
+      },
+    ]);
+  }, [followedIds, userSources, queryClient]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.bg },
     header: {
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
       paddingHorizontal: 16,
       paddingVertical: 12,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      gap: 12,
     },
+    headerLeft: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12 },
     backBtn: { padding: 4 },
     headerTitle: { fontSize: 18, fontWeight: '700' as const, color: colors.textPrimary },
+    resetBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+    resetBtnText: { fontSize: 13, color: colors.primary, fontWeight: '600' as const },
+    infoBanner: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: colors.primaryDim,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    infoText: { fontSize: 12, color: colors.primary },
     tabRow: {
       flexDirection: 'row' as const,
       backgroundColor: colors.surface,
@@ -113,7 +149,7 @@ export default function SourcesScreen() {
     itemInfo: { flex: 1, marginRight: 12 },
     itemName: { fontSize: 15, fontWeight: '500' as const, color: colors.textPrimary },
     itemTags: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-    followBtn: {
+    btn: {
       paddingHorizontal: 14,
       paddingVertical: 7,
       borderRadius: 20,
@@ -122,15 +158,16 @@ export default function SourcesScreen() {
       minWidth: 72,
       alignItems: 'center' as const,
     },
-    followBtnActive: { backgroundColor: colors.primary },
-    followBtnText: { fontSize: 13, fontWeight: '600' as const, color: colors.primary },
-    followBtnTextActive: { color: '#FFFFFF' },
+    btnActive: { backgroundColor: colors.primary },
+    btnText: { fontSize: 13, fontWeight: '600' as const, color: colors.primary },
+    btnTextActive: { color: '#FFFFFF' },
     center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, paddingTop: 60 },
     emptyText: { fontSize: 14, color: colors.textSecondary },
   }), [colors]);
 
   const renderItem = useCallback(({ item }: { item: Source }) => {
-    const followed = followedIds.has(item._id);
+    // allShown = true → all sources appear as "표시 중" (active)
+    const isShown = allShown || followedIds.has(item._id);
     const isUpdating = loadingId === item._id;
     return (
       <View style={styles.item}>
@@ -141,30 +178,45 @@ export default function SourcesScreen() {
           )}
         </View>
         <TouchableOpacity
-          style={[styles.followBtn, followed && styles.followBtnActive]}
+          style={[styles.btn, isShown && styles.btnActive]}
           onPress={() => handleToggle(item)}
           disabled={isUpdating}
           accessibilityRole="button"
-          accessibilityLabel={followed ? '팔로우 취소' : '팔로우'}
+          accessibilityLabel={isShown ? '피드에서 숨기기' : '피드에 표시'}
         >
           {isUpdating
-            ? <ActivityIndicator size="small" color={followed ? '#FFFFFF' : colors.primary} />
-            : <Text style={[styles.followBtnText, followed && styles.followBtnTextActive]}>
-                {followed ? '팔로잉' : '팔로우'}
+            ? <ActivityIndicator size="small" color={isShown ? '#FFFFFF' : colors.primary} />
+            : <Text style={[styles.btnText, isShown && styles.btnTextActive]}>
+                {isShown ? '표시 중' : '숨김'}
               </Text>
           }
         </TouchableOpacity>
       </View>
     );
-  }, [followedIds, loadingId, handleToggle, styles, colors]);
+  }, [allShown, followedIds, loadingId, handleToggle, styles, colors]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} accessibilityRole="button">
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>소스 팔로우 관리</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} accessibilityRole="button">
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>피드 소스 설정</Text>
+        </View>
+        {!allShown && (
+          <TouchableOpacity style={styles.resetBtn} onPress={handleResetAll} accessibilityRole="button">
+            <Text style={styles.resetBtnText}>전체 초기화</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.infoBanner}>
+        <Text style={styles.infoText}>
+          {allShown
+            ? '현재 전체 소스가 피드에 표시됩니다. 숨길 소스를 탭하세요.'
+            : `${followedIds.size}개 소스만 피드에 표시 중입니다.`}
+        </Text>
       </View>
 
       <View style={styles.tabRow}>
