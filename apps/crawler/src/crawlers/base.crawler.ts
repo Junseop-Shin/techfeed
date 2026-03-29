@@ -95,7 +95,7 @@ export abstract class BaseCrawler {
     // 새 콘텐츠 알림 발행
     await this.redis.publish(
       'new_content',
-      JSON.stringify({ contentId: String(saved._id), title: raw.title, tags }),
+      JSON.stringify({ contentId: String(saved._id), title: raw.title, tags, source_type: raw.type }),
     );
   }
 

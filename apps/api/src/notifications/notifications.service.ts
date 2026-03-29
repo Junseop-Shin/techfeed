@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 import { RedisProvider } from '../cache/redis.provider';
 import { UsersService } from '../users/users.service';
@@ -8,12 +8,24 @@ interface NewContentEvent {
   contentId: string;
   title: string;
   tags: string[];
+  source_type?: 'blog' | 'youtube' | 'job';
 }
 
+interface UserBatch {
+  blog: number;
+  youtube: number;
+  job: number;
+  token: string;
+  timer: NodeJS.Timeout;
+}
+
+const BATCH_DEBOUNCE_MS = 2 * 60 * 1000; // 2 minutes
+
 @Injectable()
-export class NotificationsService implements OnModuleInit {
+export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationsService.name);
   private subscriber: Redis;
+  private readonly batches = new Map<string, UserBatch>();
 
   constructor(
     private readonly redisProvider: RedisProvider,
@@ -39,6 +51,16 @@ export class NotificationsService implements OnModuleInit {
         );
       }
     });
+  }
+
+  onModuleDestroy() {
+    // Flush all pending batches on shutdown
+    for (const [userId, batch] of this.batches) {
+      clearTimeout(batch.timer);
+      this.flushBatch(userId, batch).catch(() => {});
+    }
+    this.batches.clear();
+    this.subscriber.disconnect();
   }
 
   // Redis key for per-user badge count
@@ -68,8 +90,8 @@ export class NotificationsService implements OnModuleInit {
       return;
     }
 
-    const { contentId, title, tags } = event;
-    this.logger.log(`handleNewContent: contentId=${contentId} tags=${tags.join(',')}`);
+    const { contentId, tags, source_type } = event;
+    this.logger.log(`handleNewContent: contentId=${contentId} source_type=${source_type ?? 'unknown'} tags=${tags.join(',')}`);
 
     // Collect unique users subscribed to matching tags
     const recipientMap = new Map<string, string>(); // userId -> fcm_token
@@ -82,21 +104,61 @@ export class NotificationsService implements OnModuleInit {
       }
     }
 
-    this.logger.log(`handleNewContent: found ${recipientMap.size} recipients for content ${contentId}`);
     if (recipientMap.size === 0) return;
 
-    // Send individually so each user gets their own badge count
-    let successCount = 0;
-    for (const [userId, token] of recipientMap) {
-      try {
-        const badge = await this.incrementBadge(userId);
-        await this.pushService.sendBadgeOnly(token, badge, { contentId });
-        successCount++;
-      } catch (err) {
-        this.logger.warn(`Push failed for user ${userId}: ${err}`);
-      }
-    }
+    this.logger.log(`handleNewContent: queuing for ${recipientMap.size} recipients, source_type=${source_type ?? 'unknown'}`);
 
-    this.logger.log(`Push sent to ${successCount} users for content ${contentId}`);
+    for (const [userId, token] of recipientMap) {
+      this.addToBatch(userId, token, source_type ?? 'blog');
+    }
+  }
+
+  private addToBatch(userId: string, token: string, source_type: 'blog' | 'youtube' | 'job'): void {
+    const existing = this.batches.get(userId);
+
+    if (existing) {
+      // Extend debounce window
+      clearTimeout(existing.timer);
+      existing[source_type]++;
+      existing.token = token; // update in case token changed
+      existing.timer = setTimeout(() => this.flushBatch(userId, existing).catch(() => {}), BATCH_DEBOUNCE_MS);
+    } else {
+      const batch: UserBatch = {
+        blog: source_type === 'blog' ? 1 : 0,
+        youtube: source_type === 'youtube' ? 1 : 0,
+        job: source_type === 'job' ? 1 : 0,
+        token,
+        timer: setTimeout(() => {
+          const b = this.batches.get(userId);
+          if (b) this.flushBatch(userId, b).catch(() => {});
+        }, BATCH_DEBOUNCE_MS),
+      };
+      this.batches.set(userId, batch);
+    }
+  }
+
+  private buildBatchMessage(batch: UserBatch): string {
+    const parts: string[] = [];
+    if (batch.blog > 0) parts.push(`새 블로그 ${batch.blog}개`);
+    if (batch.youtube > 0) parts.push(`유튜브 ${batch.youtube}개`);
+    if (batch.job > 0) parts.push(`채용공고 ${batch.job}개`);
+
+    if (parts.length === 0) return '';
+    return `${parts.join(', ')}가 있습니다. 확인해보세요!`;
+  }
+
+  private async flushBatch(userId: string, batch: UserBatch): Promise<void> {
+    this.batches.delete(userId);
+
+    const body = this.buildBatchMessage(batch);
+    if (!body) return;
+
+    try {
+      const badge = await this.incrementBadge(userId);
+      await this.pushService.send(batch.token, '새 콘텐츠 도착', body, undefined, badge);
+      this.logger.log(`Batch push sent to user ${userId}: ${body}`);
+    } catch (err) {
+      this.logger.warn(`Batch push failed for user ${userId}: ${err}`);
+    }
   }
 }
