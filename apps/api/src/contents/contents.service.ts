@@ -47,10 +47,10 @@ export class ContentsService implements OnModuleInit {
           title: c.title,
           summary: c.summary,
           url: c.url,
-          source_type: c.source_type,
+          source_type: c.type,
           source_name: c.source_name,
           tags: c.tags,
-          thumbnail: c.thumbnail_url,
+          thumbnail: c.thumbnail,
           published_at: c.published_at,
           view_count: c.view_count ?? 0,
         });
