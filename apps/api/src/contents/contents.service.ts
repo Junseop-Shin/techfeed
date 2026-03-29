@@ -62,6 +62,7 @@ export class ContentsService implements OnModuleInit {
           thumbnail: c.thumbnail,
           published_at: c.published_at,
           view_count: c.view_count ?? 0,
+          has_ai_summary: !!c.ai_summary,
         });
         count++;
       } catch (err) {
@@ -206,11 +207,16 @@ export class ContentsService implements OnModuleInit {
         : `ratelimit:summary:${contentType}:ip:${ip}`;
       const count = await this.cacheService.getRateLimitCount(rateLimitKey);
       if (count >= limit) {
-        throw new ForbiddenException(
-          user
+        const upgradeLimit = user ? null : limits.user; // 로그인 시 얻게 될 한도
+        throw new ForbiddenException({
+          message: user
             ? `일일 ${contentType === 'youtube' ? '영상' : '글'} AI 요약 한도(${limit}회)에 도달했습니다. 내일 다시 시도해주세요.`
-            : `비로그인 일일 ${contentType === 'youtube' ? '영상' : '글'} AI 요약 한도(${limit}회)에 도달했습니다. 로그인하면 더 많이 사용할 수 있습니다.`,
-        );
+            : `일일 ${contentType === 'youtube' ? '영상' : '글'} AI 요약 한도(${limit}회)에 도달했습니다.`,
+          limitType: 'summary',
+          contentType,
+          currentLimit: limit,
+          upgradeLimit,
+        });
       }
       await this.cacheService.incrementRateLimit(rateLimitKey, RATE_LIMIT_TTL);
     }
@@ -235,9 +241,10 @@ ${contentBody ? `내용: ${contentBody.slice(0, 3000)}` : ''}
     const result = await model.generateContent(prompt);
     const summary = result.response.text().trim();
 
-    // 5. MongoDB + Redis 저장
+    // 5. MongoDB + Redis + ES 저장
     await this.contentModel.findByIdAndUpdate(id, { ai_summary: summary });
     await this.cacheService.set(cacheKey, summary, SUMMARY_CACHE_TTL);
+    await this.searchService.updateContent(id, { has_ai_summary: true }).catch(() => {});
 
     return { summary };
   }

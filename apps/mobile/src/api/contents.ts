@@ -19,6 +19,7 @@ export interface Content {
   position?: string;
   // shared optional
   summary?: string;
+  has_ai_summary?: boolean;
 }
 
 export interface ContentsResponse {

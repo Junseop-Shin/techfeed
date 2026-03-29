@@ -19,6 +19,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
 import { useSeenStore } from '../store/seen.store';
 import { trackEvent } from '../api/analytics';
+import { SummaryLimitSheet } from './SummaryLimitSheet';
 
 interface ContentCardProps {
   content: Content;
@@ -136,6 +137,7 @@ function BlogCard({ content }: { content: Content }) {
   const colors = useThemeStore((s) => s.colors);
   const hasThumbnail = !!content.thumbnail_url;
   const [showSummary, setShowSummary] = useState(false);
+  const [limitSheet, setLimitSheet] = useState(false);
 
   const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: ['summary', content.id],
@@ -145,11 +147,19 @@ function BlogCard({ content }: { content: Content }) {
     retry: false,
   });
 
-  const summaryErrorMsg = summaryError
-    ? ((summaryError as any)?.response?.status === 403
-        ? (summaryError as any)?.response?.data?.message ?? '일일 AI 요약 한도에 도달했습니다.'
-        : '요약을 불러올 수 없습니다.')
+  const limitData = summaryError && (summaryError as any)?.response?.status === 403
+    ? (summaryError as any)?.response?.data
     : null;
+
+  const summaryErrorMsg = summaryError && !limitData ? '요약을 불러올 수 없습니다.' : null;
+
+  // 403 에러 발생 시 모달 표시
+  React.useEffect(() => {
+    if (limitData) {
+      setShowSummary(false);
+      setLimitSheet(true);
+    }
+  }, [limitData]);
 
   const styles = useMemo(() => StyleSheet.create({
     sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
@@ -204,7 +214,9 @@ function BlogCard({ content }: { content: Content }) {
           accessibilityRole="button"
           accessibilityLabel={showSummary ? 'AI 요약 접기' : 'AI 요약 보기'}
         >
-          <Text style={styles.summaryToggleText}>{showSummary ? 'AI 요약 접기 ▲' : 'AI 요약 보기 ▼'}</Text>
+          <Text style={[styles.summaryToggleText, content.has_ai_summary && { color: '#7C3AED' }]}>
+            {showSummary ? 'AI 요약 접기 ▲' : 'AI 요약 보기 ▼'}
+          </Text>
         </TouchableOpacity>
         {showSummary && (
           <View style={styles.summaryBox}>
@@ -219,6 +231,14 @@ function BlogCard({ content }: { content: Content }) {
             )}
           </View>
         )}
+        <SummaryLimitSheet
+          visible={limitSheet}
+          contentType={content.source_type}
+          currentLimit={limitData?.currentLimit ?? 0}
+          upgradeLimit={limitData?.upgradeLimit ?? null}
+          onClose={() => setLimitSheet(false)}
+          onSignUp={() => { setLimitSheet(false); router.push('/auth/signup'); }}
+        />
       </View>
       {hasThumbnail && (
         <Image
@@ -235,6 +255,8 @@ function YoutubeCard({ content }: { content: Content }) {
   const colors = useThemeStore((s) => s.colors);
   const [showSummary, setShowSummary] = useState(false);
 
+  const [limitSheet, setLimitSheet] = useState(false);
+
   const { data: summaryData, isLoading: summaryLoading, error: summaryError } = useQuery({
     queryKey: ['summary', content.id],
     queryFn: () => getContentSummary(content.id),
@@ -243,11 +265,18 @@ function YoutubeCard({ content }: { content: Content }) {
     retry: false,
   });
 
-  const summaryErrorMsg = summaryError
-    ? ((summaryError as any)?.response?.status === 403
-        ? (summaryError as any)?.response?.data?.message ?? '일일 AI 요약 한도에 도달했습니다.'
-        : '요약을 불러올 수 없습니다.')
+  const limitData = summaryError && (summaryError as any)?.response?.status === 403
+    ? (summaryError as any)?.response?.data
     : null;
+
+  const summaryErrorMsg = summaryError && !limitData ? '요약을 불러올 수 없습니다.' : null;
+
+  React.useEffect(() => {
+    if (limitData) {
+      setShowSummary(false);
+      setLimitSheet(true);
+    }
+  }, [limitData]);
 
   const styles = useMemo(() => StyleSheet.create({
     sourceName: { fontSize: 12, color: colors.textSecondary, marginBottom: 4, fontWeight: '500' as const },
@@ -282,7 +311,9 @@ function YoutubeCard({ content }: { content: Content }) {
         accessibilityRole="button"
         accessibilityLabel={showSummary ? 'AI 요약 접기' : 'AI 요약 보기'}
       >
-        <Text style={styles.summaryToggleText}>{showSummary ? 'AI 요약 접기 ▲' : 'AI 요약 보기 ▼'}</Text>
+        <Text style={[styles.summaryToggleText, content.has_ai_summary && { color: '#7C3AED' }]}>
+          {showSummary ? 'AI 요약 접기 ▲' : 'AI 요약 보기 ▼'}
+        </Text>
       </TouchableOpacity>
       {showSummary && (
         <View style={styles.summaryBox}>
@@ -297,6 +328,14 @@ function YoutubeCard({ content }: { content: Content }) {
           )}
         </View>
       )}
+      <SummaryLimitSheet
+        visible={limitSheet}
+        contentType={content.source_type}
+        currentLimit={limitData?.currentLimit ?? 0}
+        upgradeLimit={limitData?.upgradeLimit ?? null}
+        onClose={() => setLimitSheet(false)}
+        onSignUp={() => { setLimitSheet(false); router.push('/auth/signup'); }}
+      />
     </View>
   );
 }

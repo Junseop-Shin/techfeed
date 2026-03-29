@@ -122,6 +122,14 @@ export class SearchService implements OnModuleInit {
     });
   }
 
+  async updateContent(id: string, fields: Record<string, unknown>) {
+    await this.es.client.update({
+      index: INDEX_NAME,
+      id,
+      doc: fields,
+    });
+  }
+
   async searchContents(opts: SearchContentsOptions) {
     const { q, tags, source_type, page = 1, limit = 20, sort = 'date' } = opts;
     const from = (page - 1) * limit;
