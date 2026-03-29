@@ -50,6 +50,11 @@ export class NotificationsService implements OnModuleInit {
     return this.redisProvider.client.incr(this.badgeKey(userId));
   }
 
+  async getBadge(userId: string): Promise<number> {
+    const val = await this.redisProvider.client.get(this.badgeKey(userId));
+    return val ? parseInt(val, 10) : 0;
+  }
+
   async resetBadge(userId: string): Promise<void> {
     await this.redisProvider.client.set(this.badgeKey(userId), 0);
   }
@@ -83,13 +88,7 @@ export class NotificationsService implements OnModuleInit {
     for (const [userId, token] of recipientMap) {
       try {
         const badge = await this.incrementBadge(userId);
-        await this.pushService.send(
-          token,
-          '새 글이 올라왔어요',
-          title,
-          { contentId },
-          badge,
-        );
+        await this.pushService.sendBadgeOnly(token, badge, { contentId });
         successCount++;
       } catch (err) {
         this.logger.warn(`Push failed for user ${userId}: ${err}`);

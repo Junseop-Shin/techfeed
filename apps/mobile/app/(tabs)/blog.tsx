@@ -124,7 +124,6 @@ export default function BlogScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     setPage(1);
-    setAllItems([]);
     await refetch();
     setRefreshing(false);
   }, [refetch]);

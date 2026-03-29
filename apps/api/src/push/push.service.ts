@@ -61,6 +61,37 @@ export class PushService {
     }
   }
 
+  async sendBadgeOnly(
+    token: string,
+    badge: number,
+    data?: Record<string, string>,
+  ): Promise<void> {
+    try {
+      await admin.messaging().send({
+        token,
+        data,
+        apns: {
+          headers: {
+            'apns-push-type': 'background',
+            'apns-priority': '5',
+          },
+          payload: {
+            aps: {
+              'content-available': 1 as unknown as undefined,
+              badge,
+            },
+          },
+        },
+        android: {
+          data: { ...(data ?? {}), badge: String(badge) },
+          priority: 'normal',
+        },
+      });
+    } catch (err) {
+      this.logger.error(`FCM silent send failed for token ${token.slice(0, 10)}...`, err);
+    }
+  }
+
   private chunkArray<T>(arr: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let i = 0; i < arr.length; i += size) {
