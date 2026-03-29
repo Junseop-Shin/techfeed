@@ -132,8 +132,8 @@ export class BookmarksService {
       .leftJoinAndSelect('bookmark.user', 'user')
       .where('bookmark.content_type = :type', { type: 'job' })
       .andWhere(
-        '(bookmark.status IS NULL OR bookmark.status NOT IN (:...excluded))',
-        { excluded: ['탈락', '최종합격'] },
+        '(bookmark.status IS NULL OR bookmark.status IN (:...pending))',
+        { pending: ['interested', 'to_apply'] },
       )
       .getMany();
 
