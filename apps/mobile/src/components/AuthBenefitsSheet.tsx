@@ -109,11 +109,12 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose} statusBarTranslucent>
-      <Pressable style={styles.overlay} onPress={handleClose}>
-        <Animated.View
-          style={[styles.sheet, { transform: [{ translateY }] }]}
-          onStartShouldSetResponder={() => true}
-        >
+      <View style={styles.overlay}>
+        {/* Backdrop — tap to close */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+
+        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
+          {/* Handle — drag to dismiss */}
           <View {...panResponder.panHandlers} style={styles.handleArea}>
             <View style={styles.handle} />
           </View>
@@ -130,7 +131,6 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={true}
             bounces={true}
-            nestedScrollEnabled
           />
 
           <View style={styles.divider} />
@@ -144,7 +144,7 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
             </TouchableOpacity>
           </View>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
