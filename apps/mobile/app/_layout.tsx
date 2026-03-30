@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AppState, View, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, router } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
@@ -134,8 +135,10 @@ function RootLayout() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayout />
-    </QueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+        <RootLayout />
+      </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

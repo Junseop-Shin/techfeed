@@ -1,16 +1,6 @@
-import React, { useRef, useMemo } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Animated,
-  PanResponder,
-  Dimensions,
-} from 'react-native';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import BottomSheet, { BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/theme.store';
 
@@ -64,84 +54,42 @@ const BENEFITS: Benefit[] = [
   },
 ];
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
-
 export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSheetProps) {
   const colors = useThemeStore((s) => s.colors);
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(0)).current;
+  const bottomSheetRef = useRef<BottomSheet>(null);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dy > 0) {
-          translateY.setValue(gesture.dy);
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 0.5) {
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            onClose();
-            translateY.setValue(0);
-          });
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 8,
-          }).start();
-        }
-      },
-    }),
-  ).current;
+  const snapPoints = useMemo(() => ['85%'], []);
 
-  const handleClose = () => {
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 250,
-      useNativeDriver: true,
-    }).start(() => {
-      onClose();
-      translateY.setValue(0);
-    });
-  };
+  const handleSheetChanges = useCallback(
+    (index: number) => {
+      if (index === -1) onClose();
+    },
+    [onClose],
+  );
+
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />
+    ),
+    [],
+  );
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        overlay: {
+        container: {
           flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'flex-end',
+          paddingBottom: Math.max(insets.bottom, 16),
         },
-        sheet: {
+        handle: {
           backgroundColor: colors.surface,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          paddingBottom: Math.max(insets.bottom, 16) + 20,
-          maxHeight: '90%',
         },
-        handleArea: {
-          alignItems: 'center' as const,
-          paddingVertical: 12,
-        },
-        handle: {
-          width: 36,
-          height: 4,
+        handleIndicator: {
           backgroundColor: colors.border,
-          borderRadius: 2,
-        },
-        scrollContent: {
-          paddingHorizontal: 24,
-          paddingBottom: 8,
+          width: 36,
         },
         titleRow: {
           paddingTop: 8,
@@ -154,6 +102,10 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
           color: colors.textPrimary,
           lineHeight: 26,
           textAlign: 'center' as const,
+        },
+        scrollContent: {
+          paddingHorizontal: 24,
+          paddingBottom: 16,
         },
         benefitItem: {
           flexDirection: 'row' as const,
@@ -216,71 +168,60 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
     [colors, insets.bottom],
   );
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-      statusBarTranslucent
+    <BottomSheet
+      ref={bottomSheetRef}
+      index={0}
+      snapPoints={snapPoints}
+      onChange={handleSheetChanges}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      handleStyle={styles.handle}
+      handleIndicatorStyle={styles.handleIndicator}
+      backgroundStyle={{ backgroundColor: colors.surface }}
     >
-      <Pressable style={styles.overlay} onPress={handleClose} accessibilityLabel="시트 닫기">
-        <Animated.View
-          style={[styles.sheet, { transform: [{ translateY }] }]}
-          onStartShouldSetResponder={() => true}
-        >
-          {/* Handle area: swipe down to dismiss */}
-          <View {...panResponder.panHandlers} style={styles.handleArea}>
-            <View style={styles.handle} />
-          </View>
+      <View style={styles.container}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>
+            {'🔐 로그인하면 더 많은 기능을\n이용할 수 있어요'}
+          </Text>
+        </View>
 
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>
-              {'🔐 로그인하면 더 많은 기능을\n이용할 수 있어요'}
-            </Text>
-          </View>
-
-          <ScrollView
-            style={{ maxHeight: SCREEN_HEIGHT * 0.45 }}
-            showsVerticalScrollIndicator={true}
-            contentContainerStyle={styles.scrollContent}
-            bounces={true}
-            nestedScrollEnabled
-            overScrollMode="always"
-          >
-            {BENEFITS.map((benefit) => (
-              <View key={benefit.title} style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>{benefit.icon}</Text>
-                <View style={styles.benefitText}>
-                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
-                </View>
+        <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
+          {BENEFITS.map((benefit) => (
+            <View key={benefit.title} style={styles.benefitItem}>
+              <Text style={styles.benefitIcon}>{benefit.icon}</Text>
+              <View style={styles.benefitText}>
+                <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                <Text style={styles.benefitDescription}>{benefit.description}</Text>
               </View>
-            ))}
-          </ScrollView>
+            </View>
+          ))}
+        </BottomSheetScrollView>
 
-          <View style={styles.divider} />
+        <View style={styles.divider} />
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.signInButton}
-              onPress={onSignIn}
-              accessibilityRole="button"
-              accessibilityLabel="Google로 로그인"
-            >
-              <Text style={styles.signInButtonText}>Google로 로그인</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.laterButton}
-              onPress={handleClose}
-              accessibilityRole="button"
-              accessibilityLabel="나중에"
-            >
-              <Text style={styles.laterButtonText}>나중에</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.signInButton}
+            onPress={onSignIn}
+            accessibilityRole="button"
+            accessibilityLabel="Google로 로그인"
+          >
+            <Text style={styles.signInButtonText}>Google로 로그인</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.laterButton}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="나중에"
+          >
+            <Text style={styles.laterButtonText}>나중에</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </BottomSheet>
   );
 }

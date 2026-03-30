@@ -38,6 +38,7 @@
       "expo-router",
       "expo-secure-store",
       "@react-native-google-signin/google-signin",
+      "react-native-reanimated",
       [
         "expo-notifications",
         {
