@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useThemeStore } from '../../src/store/theme.store';
 import { useAuthStore } from '../../src/store/auth.store';
 import { useContents, useRecommended } from '../../src/hooks/useContents';
@@ -159,8 +161,17 @@ function JobStats() {
 function RecommendedSection({ onShowBenefits }: { onShowBenefits: () => void }) {
   const colors = useThemeStore((s) => s.colors);
   const token = useAuthStore((s) => s.token);
+  const queryClient = useQueryClient();
   const { data, isLoading } = useRecommended();
   const items = data?.items?.slice(0, 5) ?? [];
+  const isFallback = data?.meta?.isFallback ?? false;
+
+  // 설정 화면에서 구독 변경 후 복귀 시 피드 갱신
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['contents', 'recommended'] });
+    }, [queryClient]),
+  );
 
   const styles = useMemo(
     () =>
@@ -241,6 +252,20 @@ function RecommendedSection({ onShowBenefits }: { onShowBenefits: () => void }) 
           fontSize: 14,
           color: colors.primary,
         },
+        fallbackBanner: {
+          backgroundColor: colors.primaryDim,
+          borderRadius: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          flexDirection: 'row' as const,
+          alignItems: 'center' as const,
+          justifyContent: 'space-between' as const,
+          marginBottom: 10,
+        },
+        fallbackBannerText: {
+          fontSize: 13,
+          color: colors.primary,
+        },
       }),
     [colors]
   );
@@ -264,6 +289,17 @@ function RecommendedSection({ onShowBenefits }: { onShowBenefits: () => void }) 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>맞춤 추천</Text>
       </View>
+      {!isLoading && isFallback && (
+        <TouchableOpacity
+          style={styles.fallbackBanner}
+          onPress={() => router.push('/(tabs)/settings')}
+          accessibilityRole="button"
+          accessibilityLabel="구독 설정하기"
+        >
+          <Text style={styles.fallbackBannerText}>구독을 설정하면 맞춤 콘텐츠를 받을 수 있어요</Text>
+          <Text style={{ color: colors.primary }}>→</Text>
+        </TouchableOpacity>
+      )}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

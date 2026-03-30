@@ -10,6 +10,9 @@ import {
   Share,
   Alert,
 } from 'react-native';
+import { BlogDetailRenderer } from '../../src/components/detail/BlogDetailRenderer';
+import { YoutubeDetailRenderer } from '../../src/components/detail/YoutubeDetailRenderer';
+import { JobDetailRenderer } from '../../src/components/detail/JobDetailRenderer';
 
 const JOB_STATUS_OPTIONS = [
   { value: 'interested', label: '관심', color: '#6B7280' },
@@ -155,9 +158,12 @@ export default function ContentDetailScreen() {
     );
   }
 
+  const youtubeVideoId =
+    contentType === 'youtube' ? extractYoutubeVideoId(content.url) : null;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, isJob && styles.contentWithStickyFooter]}>
         <View style={styles.meta}>
           <Text style={[styles.sourceType, { color: colors.primary, backgroundColor: colors.primaryDim }]}>
             {sourceTypeLabel(content.source_type)}
@@ -185,7 +191,34 @@ export default function ContentDetailScreen() {
           </View>
         )}
 
-        {content.summary && (
+        {/* YouTube: 영상 임베드 */}
+        {contentType === 'youtube' && youtubeVideoId && (
+          <View style={styles.rendererSection}>
+            <YoutubeDetailRenderer
+              videoId={youtubeVideoId}
+              thumbnail={(content as any).thumbnail_url}
+              description={content.summary}
+            />
+          </View>
+        )}
+
+        {/* Blog: summary → HTML 렌더링 */}
+        {contentType === 'blog' && content.summary && !(content as any).content_body && (
+          <View style={[styles.summaryBox, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
+            <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{content.summary}</Text>
+          </View>
+        )}
+        {contentType === 'blog' && (content as any).content_body && (
+          <View style={styles.rendererSection}>
+            <BlogDetailRenderer
+              html={(content as any).content_body}
+              onLinkPress={(url) => Linking.openURL(url).catch(() => {})}
+            />
+          </View>
+        )}
+
+        {/* Job: summary (비구조화 폴백용) — JobDetailRenderer는 아래에서 별도 렌더 */}
+        {contentType === 'job' && content.summary && !(content as any).job_detail && !(content as any).content_body && (
           <View style={[styles.summaryBox, { backgroundColor: colors.surface, borderLeftColor: colors.primary }]}>
             <Text style={[styles.summaryText, { color: colors.textSecondary }]}>{content.summary}</Text>
           </View>
@@ -267,24 +300,61 @@ export default function ContentDetailScreen() {
           </View>
         )}
 
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        {/* Job: 구조화 상세 내용 */}
+        {isJob && ((content as any).job_detail || (content as any).content_body) && (
+          <View style={styles.rendererSection}>
+            <JobDetailRenderer
+              location={content.summary}
+              jobDetail={(content as any).job_detail}
+              contentBody={(content as any).content_body}
+            />
+          </View>
+        )}
 
-        <Text style={[styles.urlLabel, { color: colors.textSecondary }]}>원문 링크</Text>
-        <Text style={[styles.url, { color: colors.primary }]} numberOfLines={2}>{content.url}</Text>
-
-        <TouchableOpacity
-          style={[styles.openButton, { backgroundColor: colors.primary }]}
-          onPress={handleOpenExternal}
-          accessibilityRole="button"
-          accessibilityLabel="원문 열기"
-        >
-          <Text style={styles.openButtonText}>원문 보기</Text>
-        </TouchableOpacity>
+        {/* Blog/YouTube: 원문 링크 */}
+        {!isJob && (
+          <>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.urlLabel, { color: colors.textSecondary }]}>원문 링크</Text>
+            <Text style={[styles.url, { color: colors.primary }]} numberOfLines={2}>{content.url}</Text>
+            <TouchableOpacity
+              style={[styles.openButton, { backgroundColor: colors.primary }]}
+              onPress={handleOpenExternal}
+              accessibilityRole="button"
+              accessibilityLabel="원문 열기"
+            >
+              <Text style={styles.openButtonText}>원문 보기</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
         <CommentSection contentId={content.id} />
       </ScrollView>
+
+      {/* Job: sticky 지원하기 CTA — SafeAreaView edges={['bottom']} handles home indicator */}
+      {isJob && (
+        <View style={[styles.stickyApply, { borderTopColor: colors.border, backgroundColor: colors.bg }]}>
+          <TouchableOpacity
+            style={[styles.applyButton, { backgroundColor: colors.primary }]}
+            onPress={() => Linking.openURL(content.url).catch(() => {})}
+            accessibilityRole="button"
+            accessibilityLabel="원문에서 지원하기"
+          >
+            <Text style={styles.applyButtonText}>지원하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
+}
+
+function extractYoutubeVideoId(url: string): string | null {
+  // youtu.be/VIDEO_ID
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+  // youtube.com/watch?v=VIDEO_ID or &v=VIDEO_ID
+  const longMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  return longMatch?.[1] ?? null;
 }
 
 function sourceTypeLabel(type: string): string {
@@ -299,6 +369,8 @@ function sourceTypeLabel(type: string): string {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20, paddingBottom: 40 },
+  contentWithStickyFooter: { paddingBottom: 100 },
+  rendererSection: { marginBottom: 16 },
   meta: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginRight: 8 },
   sourceType: {
     fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3,
@@ -334,6 +406,9 @@ const styles = StyleSheet.create({
   url: { fontSize: 13, marginBottom: 20, lineHeight: 18 },
   openButton: { borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginBottom: 8 },
   openButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  stickyApply: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, borderTopWidth: 1 },
+  applyButton: { borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  applyButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   errorText: { fontSize: 15, marginBottom: 16 },
   backButton: { paddingHorizontal: 20, paddingVertical: 10 },

@@ -1,6 +1,13 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import * as crypto from 'crypto';
 
+export interface JobDetail {
+  description?: string;
+  requirements?: string[];
+  preferred?: string[];
+  benefits?: string[];
+}
+
 export interface IContent {
   type: 'blog' | 'youtube' | 'job';
   title: string;
@@ -17,6 +24,7 @@ export interface IContent {
   company_name?: string;
   position?: string;
   position_hash?: string;
+  job_detail?: JobDetail;
 }
 
 export type ContentDocument = IContent & Document;
@@ -37,6 +45,7 @@ const ContentSchema = new Schema<ContentDocument>(
     company_name: { type: String },
     position: { type: String },
     position_hash: { type: String, sparse: true },
+    job_detail: { type: Object },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: false } },
 );

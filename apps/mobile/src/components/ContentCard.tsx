@@ -20,6 +20,7 @@ import { useThemeStore } from '../store/theme.store';
 import { useSeenStore } from '../store/seen.store';
 import { trackEvent } from '../api/analytics';
 import { SummaryLimitSheet } from './SummaryLimitSheet';
+import { TYPE_BADGE_COLORS } from '../theme/tokens';
 
 interface ContentCardProps {
   content: Content;
@@ -168,7 +169,7 @@ function BlogCard({ content }: { content: Content }) {
     meta: { flexDirection: 'row' as const, marginTop: 4 },
     metaText: { fontSize: 12, color: colors.textTertiary },
     tagRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, marginTop: 8 },
-    tagBadge: { backgroundColor: colors.primaryDim, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, marginRight: 6, marginBottom: 4 },
+    tagBadge: { backgroundColor: colors.primaryDim, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginRight: 6, marginBottom: 4 },
     tagText: { fontSize: 11, color: colors.primary, fontWeight: '500' as const },
     blogThumbnail: { width: 80, height: 80, borderRadius: 8, backgroundColor: colors.searchBg, flexShrink: 0 },
     summaryToggle: { marginTop: 10, paddingVertical: 6 },
@@ -182,7 +183,12 @@ function BlogCard({ content }: { content: Content }) {
     <View style={[cardStyles.cardInner, hasThumbnail && cardStyles.cardInnerRow]}>
       <View style={hasThumbnail ? cardStyles.blogTextBlock : undefined}>
         <View style={cardStyles.rowBetween}>
-          <Text style={styles.sourceName}>{content.source_name}</Text>
+          <View style={cardStyles.sourceRow}>
+            <View style={[cardStyles.typeBadge, { backgroundColor: TYPE_BADGE_COLORS['blog'] }]}>
+              <Text style={cardStyles.typeBadgeText}>블로그</Text>
+            </View>
+            <Text style={styles.sourceName}>{content.source_name}</Text>
+          </View>
           <View style={cardStyles.actionGroup}>
             <LikeButton contentId={content.id} likeCount={(content as any).like_count} />
             <BookmarkButton contentId={content.id} sourceType={content.source_type} />
@@ -292,7 +298,12 @@ function YoutubeCard({ content }: { content: Content }) {
   return (
     <View style={cardStyles.cardInner}>
       <View style={cardStyles.rowBetween}>
-        <Text style={styles.sourceName}>{content.channel_name ?? content.source_name}</Text>
+        <View style={cardStyles.sourceRow}>
+          <View style={[cardStyles.typeBadge, { backgroundColor: TYPE_BADGE_COLORS['youtube'] }]}>
+            <Text style={cardStyles.typeBadgeText}>YouTube</Text>
+          </View>
+          <Text style={styles.sourceName}>{content.channel_name ?? content.source_name}</Text>
+        </View>
         <View style={cardStyles.actionGroup}>
           <LikeButton contentId={content.id} likeCount={(content as any).like_count} />
           <BookmarkButton contentId={content.id} sourceType={content.source_type} />
@@ -348,7 +359,7 @@ function JobCard({ content }: { content: Content }) {
     title: { fontSize: 16, fontWeight: '600' as const, color: colors.textPrimary, lineHeight: 22, marginBottom: 6 },
     jobLocation: { fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
     tagRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, marginTop: 8 },
-    tagBadge: { backgroundColor: colors.primaryDim, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, marginRight: 6, marginBottom: 4 },
+    tagBadge: { backgroundColor: colors.primaryDim, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginRight: 6, marginBottom: 4 },
     tagText: { fontSize: 11, color: colors.primary, fontWeight: '500' as const },
     metaText: { fontSize: 12, color: colors.textTertiary },
   }), [colors]);
@@ -356,7 +367,12 @@ function JobCard({ content }: { content: Content }) {
   return (
     <View style={cardStyles.cardInner}>
       <View style={cardStyles.rowBetween}>
-        <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
+        <View style={cardStyles.sourceRow}>
+          <View style={[cardStyles.typeBadge, { backgroundColor: TYPE_BADGE_COLORS['job'] }]}>
+            <Text style={cardStyles.typeBadgeText}>채용</Text>
+          </View>
+          <Text style={styles.sourceName}>{content.company_name ?? content.source_name}</Text>
+        </View>
         <View style={cardStyles.actionGroup}>
           <LikeButton contentId={content.id} likeCount={(content as any).like_count} />
           <BookmarkButton contentId={content.id} sourceType={content.source_type} />
@@ -428,7 +444,10 @@ const cardStyles = StyleSheet.create({
   },
   cardInner: { padding: 16 },
   cardInnerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  typeBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  typeBadgeText: { fontSize: 10, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.3 },
   actionGroup: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   blogTextBlock: { flex: 1 },
   likeBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, padding: 4 },

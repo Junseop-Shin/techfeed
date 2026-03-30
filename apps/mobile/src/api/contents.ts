@@ -19,7 +19,14 @@ export interface Content {
   position?: string;
   // shared optional
   summary?: string;
+  content_body?: string;
   has_ai_summary?: boolean;
+  job_detail?: {
+    description?: string;
+    requirements?: string[];
+    preferred?: string[];
+    benefits?: string[];
+  };
 }
 
 export interface ContentsResponse {
@@ -53,7 +60,12 @@ export const autocomplete = (q: string): Promise<string[]> =>
 export const getContentSummary = (id: string): Promise<{ summary: string }> =>
   apiClient.get(`/contents/${id}/summary`).then((r) => r.data);
 
-export const getRecommended = (): Promise<ContentsResponse> =>
+export interface RecommendedResponse {
+  items: Content[];
+  meta: { isFallback: boolean; subscriptionCount: number };
+}
+
+export const getRecommended = (): Promise<RecommendedResponse> =>
   apiClient.get('/contents/recommended').then((r) => r.data);
 
 export const getLikeStatus = (contentId: string): Promise<{ liked: boolean }> =>

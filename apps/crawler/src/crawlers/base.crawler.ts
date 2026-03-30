@@ -1,7 +1,20 @@
 import { Client } from '@elastic/elasticsearch';
 import Redis from 'ioredis';
-import { ContentModel, hashUrl, IContent } from '../models/content.model';
+import sanitizeHtml from 'sanitize-html';
+import { ContentModel, hashUrl, IContent, JobDetail } from '../models/content.model';
 import { keywordTagMap } from '../config';
+
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'h1', 'h2', 'pre', 'code']),
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    img: ['src', 'alt', 'width', 'height'],
+    a: ['href', 'title'],
+    code: ['class'],
+    pre: ['class'],
+  },
+  allowedSchemes: ['http', 'https'],
+};
 
 const ES_INDEX = 'contents';
 const TRENDING_KEY = 'rank:contents';
@@ -18,6 +31,7 @@ export interface RawContent {
   published_at: Date;
   company_name?: string;
   position?: string;
+  job_detail?: JobDetail;
 }
 
 export abstract class BaseCrawler {
@@ -76,6 +90,7 @@ export abstract class BaseCrawler {
 
     const doc: Omit<IContent, 'created_at'> = {
       ...raw,
+      ...(raw.content_body && { content_body: sanitizeHtml(raw.content_body, SANITIZE_OPTIONS) }),
       url_hash,
       tags,
       es_indexed: false,

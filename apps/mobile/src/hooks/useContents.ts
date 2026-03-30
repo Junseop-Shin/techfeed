@@ -6,6 +6,7 @@ import {
   autocomplete,
   getRecommended,
   type ContentsParams,
+  type RecommendedResponse,
 } from '../api/contents';
 
 export const useContents = (params: ContentsParams) =>
@@ -35,4 +36,4 @@ export const useAutocomplete = (q: string) =>
   });
 
 export const useRecommended = () =>
-  useQuery({ queryKey: ['contents', 'recommended'], queryFn: getRecommended });
+  useQuery<RecommendedResponse>({ queryKey: ['contents', 'recommended'], queryFn: getRecommended });

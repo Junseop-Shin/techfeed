@@ -59,6 +59,14 @@ export class Content {
 
   @Prop()
   position?: string;
+
+  @Prop({ type: Object })
+  job_detail?: {
+    description?: string;
+    requirements?: string[];
+    preferred?: string[];
+    benefits?: string[];
+  };
 }
 
 export const ContentSchema = SchemaFactory.createForClass(Content);

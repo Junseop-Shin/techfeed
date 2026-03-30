@@ -7,6 +7,7 @@ import { Content, ContentDocument } from '../contents/content.schema';
 import { UsersService } from '../users/users.service';
 import { PushService } from '../push/push.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
+import { NotificationsService } from './notifications.service';
 
 const TRENDING_KEY = 'rank:contents';
 const TOP_N = 3;
@@ -22,7 +23,29 @@ export class NotificationsScheduler {
     private readonly usersService: UsersService,
     private readonly pushService: PushService,
     private readonly bookmarksService: BookmarksService,
+    private readonly notificationsService: NotificationsService,
   ) {}
+
+  // 새 콘텐츠 푸시 — 하루 4회: 08:30, 12:00, 18:00, 21:00
+  @Cron('30 8 * * *')
+  async sendNewContentBatch0830(): Promise<void> {
+    await this.notificationsService.flushAllBatches();
+  }
+
+  @Cron('0 12 * * *')
+  async sendNewContentBatch1200(): Promise<void> {
+    await this.notificationsService.flushAllBatches();
+  }
+
+  @Cron('0 18 * * *')
+  async sendNewContentBatch1800(): Promise<void> {
+    await this.notificationsService.flushAllBatches();
+  }
+
+  @Cron('0 21 * * *')
+  async sendNewContentBatch2100(): Promise<void> {
+    await this.notificationsService.flushAllBatches();
+  }
 
   // Every Monday at 09:00
   @Cron('0 9 * * 1')

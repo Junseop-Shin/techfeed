@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { DataSource } from 'typeorm';
 import { Cron } from '@nestjs/schedule';
 import { Content, ContentDocument } from './content.schema';
@@ -248,52 +248,99 @@ ${contentBody ? `내용: ${contentBody.slice(0, 3000)}` : ''}
     return { summary };
   }
 
-  async getRecommended(userId: string | null, limit = 20) {
-    if (!userId) {
-      return this.contentModel
-        .find()
-        .sort({ published_at: -1 })
-        .limit(limit)
-        .lean()
-        .exec();
+  private async getPopularFallback(limit: number, excludeIds: string[] = []) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const cacheKey = 'recommended:fallback';
+
+    const cached = await this.cacheService.getFeedCache(cacheKey);
+    if (cached && excludeIds.length === 0) return JSON.parse(cached);
+
+    const query: Record<string, unknown> = { published_at: { $gte: sevenDaysAgo } };
+    if (excludeIds.length > 0) {
+      query._id = { $nin: excludeIds.map((id) => new Types.ObjectId(id)) };
     }
 
-    const subscriptions = await this.subscriptionsService.findByUserId(userId);
-
-    if (subscriptions.length === 0) {
-      return this.contentModel
-        .find()
-        .sort({ published_at: -1 })
-        .limit(limit)
-        .lean()
-        .exec();
-    }
-
-    const tagSubs = subscriptions.filter((s) => s.type === 'tag').map((s) => s.tag);
-    const channelSubs = subscriptions.filter((s) => s.type === 'channel').map((s) => s.tag);
-
-    const orConditions: Record<string, unknown>[] = [];
-    if (tagSubs.length > 0) {
-      orConditions.push({ tags: { $in: tagSubs } });
-    }
-    if (channelSubs.length > 0) {
-      orConditions.push({ source_name: { $in: channelSubs } });
-    }
-
-    if (orConditions.length === 0) {
-      return this.contentModel
-        .find()
-        .sort({ published_at: -1 })
-        .limit(limit)
-        .lean()
-        .exec();
-    }
-
-    return this.contentModel
-      .find({ $or: orConditions })
-      .sort({ published_at: -1 })
-      .limit(limit)
-      .lean()
+    const items = await this.contentModel
+      .aggregate([
+        { $match: query },
+        { $addFields: { score: { $add: [{ $multiply: ['$view_count', 0.4] }, { $multiply: ['$like_count', 0.6] }] } } },
+        { $sort: { score: -1, published_at: -1 } },
+        { $limit: limit },
+      ])
       .exec();
+
+    const result = items.map((c: any) => ({ ...c, id: String(c._id) }));
+
+    if (excludeIds.length === 0) {
+      await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
+    }
+    return result;
+  }
+
+  async getRecommended(userId: string | null, limit = 20) {
+    // 비로그인: 인기 폴백
+    if (!userId) {
+      const items = await this.getPopularFallback(limit);
+      return { items, meta: { isFallback: true, subscriptionCount: 0 } };
+    }
+
+    const subscriptions = await this.subscriptionsService.findByUserId(userId) ?? [];
+    const subscriptionCount = subscriptions.length;
+
+    // 구독 없음: 인기 폴백
+    if (subscriptionCount === 0) {
+      const items = await this.getPopularFallback(limit);
+      return { items, meta: { isFallback: true, subscriptionCount: 0 } };
+    }
+
+    // tag + subject → content tags, channel → source_name
+    const tagSubs = subscriptions
+      .filter((s) => s.type === 'tag' || s.type === 'subject')
+      .map((s) => s.tag);
+    const channelSubs = subscriptions
+      .filter((s) => s.type === 'channel')
+      .map((s) => s.tag);
+
+    // 병렬 쿼리로 인덱스를 확실히 탐
+    const [byTag, byChannel] = await Promise.all([
+      tagSubs.length > 0
+        ? this.contentModel
+            .find({ tags: { $in: tagSubs } })
+            .sort({ published_at: -1 })
+            .limit(limit)
+            .lean()
+            .exec()
+        : Promise.resolve([]),
+      channelSubs.length > 0
+        ? this.contentModel
+            .find({ source_name: { $in: channelSubs } })
+            .sort({ published_at: -1 })
+            .limit(limit)
+            .lean()
+            .exec()
+        : Promise.resolve([]),
+    ]);
+
+    // 중복 제거 (id 기준)
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const item of [...byTag, ...byChannel]) {
+      const id = String(item._id);
+      if (!seen.has(id)) {
+        seen.add(id);
+        merged.push({ ...item, id });
+      }
+    }
+
+    // 부족하면 인기 콘텐츠로 보충
+    if (merged.length < limit) {
+      const fill = await this.getPopularFallback(limit - merged.length, [...seen]);
+      merged.push(...fill);
+    }
+
+    return {
+      items: merged.slice(0, limit),
+      meta: { isFallback: false, subscriptionCount },
+    };
   }
 }

@@ -16,10 +16,7 @@ interface UserBatch {
   youtube: number;
   job: number;
   token: string;
-  timer: NodeJS.Timeout;
 }
-
-const BATCH_DEBOUNCE_MS = 2 * 60 * 1000; // 2 minutes
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
@@ -54,11 +51,6 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    // Flush all pending batches on shutdown
-    for (const [userId, batch] of this.batches) {
-      clearTimeout(batch.timer);
-      this.flushBatch(userId, batch).catch(() => {});
-    }
     this.batches.clear();
     this.subscriber.disconnect();
   }
@@ -117,24 +109,27 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     const existing = this.batches.get(userId);
 
     if (existing) {
-      // Extend debounce window
-      clearTimeout(existing.timer);
       existing[source_type]++;
       existing.token = token; // update in case token changed
-      existing.timer = setTimeout(() => this.flushBatch(userId, existing).catch(() => {}), BATCH_DEBOUNCE_MS);
     } else {
-      const batch: UserBatch = {
+      this.batches.set(userId, {
         blog: source_type === 'blog' ? 1 : 0,
         youtube: source_type === 'youtube' ? 1 : 0,
         job: source_type === 'job' ? 1 : 0,
         token,
-        timer: setTimeout(() => {
-          const b = this.batches.get(userId);
-          if (b) this.flushBatch(userId, b).catch(() => {});
-        }, BATCH_DEBOUNCE_MS),
-      };
-      this.batches.set(userId, batch);
+      });
     }
+  }
+
+  // 스케줄러에서 하루 4회 호출 (08:30, 12:00, 18:00, 21:00)
+  async flushAllBatches(): Promise<void> {
+    if (this.batches.size === 0) return;
+
+    this.logger.log(`Flushing ${this.batches.size} pending notification batches`);
+    const entries = [...this.batches.entries()];
+    this.batches.clear();
+
+    await Promise.allSettled(entries.map(([userId, batch]) => this.flushBatch(userId, batch)));
   }
 
   private buildBatchMessage(batch: UserBatch): string {
