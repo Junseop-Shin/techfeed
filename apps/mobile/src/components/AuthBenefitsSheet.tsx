@@ -145,7 +145,8 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
         },
         titleRow: {
           paddingTop: 8,
-          paddingBottom: 20,
+          paddingBottom: 16,
+          paddingHorizontal: 24,
         },
         title: {
           fontSize: 18,
@@ -233,28 +234,31 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
             <View style={styles.handle} />
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={true}
-            contentContainerStyle={styles.scrollContent}
-            bounces={false}
-            nestedScrollEnabled
-          >
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>
-                {'🔐 로그인하면 더 많은 기능을\n이용할 수 있어요'}
-              </Text>
-            </View>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>
+              {'🔐 로그인하면 더 많은 기능을\n이용할 수 있어요'}
+            </Text>
+          </View>
 
-            {BENEFITS.map((benefit) => (
-              <View key={benefit.title} style={styles.benefitItem}>
-                <Text style={styles.benefitIcon}>{benefit.icon}</Text>
-                <View style={styles.benefitText}>
-                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.scrollContent}
+              bounces={true}
+              nestedScrollEnabled
+              overScrollMode="always"
+            >
+              {BENEFITS.map((benefit) => (
+                <View key={benefit.title} style={styles.benefitItem}>
+                  <Text style={styles.benefitIcon}>{benefit.icon}</Text>
+                  <View style={styles.benefitText}>
+                    <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                    <Text style={styles.benefitDescription}>{benefit.description}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          </View>
 
           <View style={styles.divider} />
 

@@ -23,6 +23,9 @@ fi
 # Ensure .easignore at repo root (excludes gitignore rules that block google-services.json)
 cp "$SCRIPT_DIR/.easignore" "$REPO_ROOT/.easignore" 2>/dev/null || true
 
+# Remove android/ so EAS uses managed mode (auto prebuild + keystore injection)
+rm -rf "$SCRIPT_DIR/android"
+
 echo "📦 Building APK via EAS local build..."
 npx eas build --platform android --profile preview --local \
   --output "$SCRIPT_DIR/build-output.apk" \
