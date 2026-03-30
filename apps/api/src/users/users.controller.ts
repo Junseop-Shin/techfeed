@@ -8,9 +8,11 @@ import {
   Post,
   Put,
   Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import * as bcrypt from 'bcrypt';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService, UserStats } from './users.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
@@ -31,6 +33,12 @@ class UpdateNameDto {
   @IsString()
   @MaxLength(30)
   name: string;
+}
+
+class DeleteAccountDto {
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 
 class UpdatePreferencesDto {
@@ -76,6 +84,7 @@ export class UsersController {
       email: user.email,
       name: user.name,
       created_at: user.created_at,
+      has_password: !!user.password,
       tags: user.subscriptions?.map((s) => s.tag) ?? [],
     };
   }
@@ -146,6 +155,29 @@ export class UsersController {
     @Body() dto: UpdateNameDto,
   ) {
     await this.usersService.updateName(req.user.userId, dto.name);
+    return { success: true };
+  }
+
+  @Delete()
+  async deleteAccount(
+    @Request() req: { user: { userId: string } },
+    @Body() dto: DeleteAccountDto,
+  ) {
+    const user = await this.usersService.findById(req.user.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // Require password confirmation for email/password users
+    if (user.password) {
+      if (!dto.password) {
+        throw new UnauthorizedException('Password confirmation required');
+      }
+      const match = await bcrypt.compare(dto.password, user.password);
+      if (!match) {
+        throw new UnauthorizedException('Invalid password');
+      }
+    }
+
+    await this.usersService.deleteAccount(req.user.userId);
     return { success: true };
   }
 }

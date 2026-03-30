@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -10,5 +10,9 @@ export class SignupDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   name?: string;
+
+  @IsBoolean()
+  agreed_terms: boolean;
 }

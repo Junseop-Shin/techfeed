@@ -9,6 +9,7 @@ export interface SignupRequest {
   email: string;
   password: string;
   name?: string;
+  agreed_terms: boolean;
 }
 
 export interface AuthResponse {

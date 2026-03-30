@@ -30,11 +30,11 @@ export class BookmarksController {
 
   @Post(':contentId')
   async add(
-    @Request() req: { user: { userId: string; email: string } },
+    @Request() req: { user: { userId: string; isPremium?: boolean } },
     @Param('contentId') contentId: string,
     @Body() body: AddBookmarkDto,
   ) {
-    await this.bookmarksService.add(req.user.userId, req.user.email, contentId, body.content_type, body.status);
+    await this.bookmarksService.add(req.user.userId, req.user.isPremium ?? false, contentId, body.content_type, body.status);
     return { success: true };
   }
 

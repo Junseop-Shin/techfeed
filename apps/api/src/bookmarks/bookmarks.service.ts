@@ -22,7 +22,6 @@ const BOOKMARK_LIMITS: Record<string, number> = {
   youtube: 30,
   job:     30,
 };
-const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
 @Injectable()
 export class BookmarksService {
@@ -70,8 +69,8 @@ export class BookmarksService {
     });
   }
 
-  async add(userId: string, email: string, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
-    if (!PREMIUM_EMAILS.has(email) && contentType) {
+  async add(userId: string, isPremium: boolean, contentId: string, contentType?: string, statusOverride?: string): Promise<void> {
+    if (!isPremium && contentType) {
       const limit = BOOKMARK_LIMITS[contentType] ?? 30;
       const count = await this.repo.count({
         where: { user: { id: userId }, content_type: contentType },

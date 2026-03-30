@@ -20,7 +20,7 @@ const CrawlerSourceSchema = new Schema(
     tags: { type: [String], default: [] },
     enabled: { type: Boolean, default: true },
   },
-  { collection: 'crawler_sources', timestamps: true }
+  { collection: 'crawlersources', timestamps: true }
 );
 
 export const CrawlerSourceModel = mongoose.model<CrawlerSourceDoc>(

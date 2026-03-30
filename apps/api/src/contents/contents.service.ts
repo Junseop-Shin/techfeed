@@ -14,7 +14,6 @@ import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 const SUMMARY_CACHE_TTL = 60 * 60 * 24 * 7; // 7일
 const RATE_LIMIT_TTL = 60 * 60 * 24; // 24시간
-const PREMIUM_EMAILS = new Set(['nuclearbomb6518@gmail.com']);
 
 // 콘텐츠 타입별 일일 AI 요약 한도 (비로그인, 로그인)
 const SUMMARY_LIMITS: Record<string, { anonymous: number; user: number }> = {
@@ -178,7 +177,7 @@ export class ContentsService implements OnModuleInit {
 
   async getSummary(
     id: string,
-    user: { userId: string; email: string } | null,
+    user: { userId: string; email: string; isPremium?: boolean } | null,
     ip: string,
   ): Promise<{ summary: string }> {
     const cacheKey = `summary:${id}`;
@@ -197,7 +196,7 @@ export class ContentsService implements OnModuleInit {
     }
 
     // 3. Rate limit 체크 (신규 Gemini 호출 전에만 적용)
-    const isPremium = user ? PREMIUM_EMAILS.has(user.email) : false;
+    const isPremium = user?.isPremium ?? false;
     if (!isPremium) {
       const contentType = content.type ?? 'blog';
       const limits = SUMMARY_LIMITS[contentType] ?? SUMMARY_LIMITS['blog'];

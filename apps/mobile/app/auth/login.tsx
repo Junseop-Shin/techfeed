@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -121,6 +122,14 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.forgotButton}
+            onPress={() => router.push('/auth/forgot-password')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
+          </TouchableOpacity>
+
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>또는</Text>
@@ -141,6 +150,14 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
+
+          <Text style={styles.consentNotice}>
+            계속하면{' '}
+            <Text style={styles.consentLink} onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_API_URL ?? ''}/legal/terms.html`)}>이용약관</Text>
+            {' 및 '}
+            <Text style={styles.consentLink} onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_API_URL ?? ''}/legal/privacy.html`)}>개인정보처리방침</Text>
+            에 동의하는 것으로 간주됩니다.
+          </Text>
 
           <TouchableOpacity
             style={styles.linkButton}
@@ -205,6 +222,10 @@ const styles = StyleSheet.create({
   },
   googleIcon: { fontSize: 18, fontWeight: '700', color: '#EA4335' },
   socialButtonText: { fontSize: 15, fontWeight: '500', color: '#374151' },
+  forgotButton: { alignItems: 'flex-end', marginTop: 8 },
+  forgotText: { fontSize: 13, color: '#6B7280' },
+  consentNotice: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 16, lineHeight: 18 },
+  consentLink: { color: '#2563EB', textDecorationLine: 'underline' },
   linkButton: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },
   linkText: { fontSize: 14, color: '#2563EB' },
 });

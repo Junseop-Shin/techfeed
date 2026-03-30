@@ -92,7 +92,7 @@ export class ContentsController {
   @UseGuards(OptionalJwtAuthGuard)
   async getSummary(
     @Param('id') id: string,
-    @Request() req: { user?: { userId: string; email: string } },
+    @Request() req: { user?: { userId: string; email: string; isPremium?: boolean } },
     @Ip() ip: string,
   ) {
     return this.contentsService.getSummary(id, req.user ?? null, ip);
