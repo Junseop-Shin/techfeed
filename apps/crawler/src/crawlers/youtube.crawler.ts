@@ -45,7 +45,10 @@ export class YouTubeCrawler extends BaseCrawler {
 
         const uploadsPlaylistId =
           channelRes.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-        if (!uploadsPlaylistId) continue;
+        if (!uploadsPlaylistId) {
+          console.warn(`[YouTubeCrawler] No uploads playlist for channel: ${source.name} (${source.channelId})`);
+          continue;
+        }
 
         const playlistRes = await youtube.playlistItems.list({
           part: ['snippet'],
