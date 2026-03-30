@@ -10,16 +10,20 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSignup } from '../../src/hooks/useAuth';
 import { trackEvent } from '../../src/api/analytics';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
+
 export default function SignupScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   const { mutate: doSignup, isPending } = useSignup();
 
@@ -32,8 +36,12 @@ export default function SignupScreen() {
       Alert.alert('입력 오류', '비밀번호는 8자 이상이어야 합니다.');
       return;
     }
+    if (!agreedTerms) {
+      Alert.alert('약관 동의', '이용약관 및 개인정보처리방침에 동의해주세요.');
+      return;
+    }
     doSignup(
-      { name, email, password },
+      { name, email, password, agreed_terms: true },
       {
         onSuccess: () => {
           trackEvent([{ event_type: 'signup' }]);
@@ -101,6 +109,29 @@ export default function SignupScreen() {
               onSubmitEditing={handleSignup}
               returnKeyType="done"
             />
+
+            <TouchableOpacity
+              style={styles.consentRow}
+              onPress={() => setAgreedTerms(!agreedTerms)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: agreedTerms }}
+            >
+              <View style={[styles.checkbox, agreedTerms && styles.checkboxChecked]}>
+                {agreedTerms && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.consentText}>
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => Linking.openURL(`${API_URL}/legal/terms.html`)}
+                >이용약관</Text>
+                {' 및 '}
+                <Text
+                  style={styles.consentLink}
+                  onPress={() => Linking.openURL(`${API_URL}/legal/privacy.html`)}
+                >개인정보처리방침</Text>
+                에 동의합니다
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.button, isPending && styles.buttonDisabled]}
@@ -199,5 +230,40 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 14,
     color: '#2563EB',
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 16,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  consentText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 18,
+  },
+  consentLink: {
+    color: '#2563EB',
+    textDecorationLine: 'underline',
   },
 });

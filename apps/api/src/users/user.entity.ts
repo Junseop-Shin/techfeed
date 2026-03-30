@@ -28,6 +28,18 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   fcm_token: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  is_premium: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  agreed_terms_at: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  reset_token: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  reset_token_expires: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 

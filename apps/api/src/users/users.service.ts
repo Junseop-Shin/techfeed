@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Subscription } from '../subscriptions/subscription.entity';
+import { RedisProvider } from '../cache/redis.provider';
 
 export interface TagDistributionItem {
   tag: string;
@@ -19,6 +20,8 @@ export interface UserStats {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -26,6 +29,7 @@ export class UsersService {
     private readonly subscriptionRepo: Repository<Subscription>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly redisProvider: RedisProvider,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -39,8 +43,13 @@ export class UsersService {
     });
   }
 
-  async create(email: string, hashedPassword: string, name?: string): Promise<User> {
-    const user = this.userRepo.create({ email, password: hashedPassword, name });
+  async create(email: string, hashedPassword: string, name?: string, agreedTerms?: boolean): Promise<User> {
+    const user = this.userRepo.create({
+      email,
+      password: hashedPassword,
+      name,
+      agreed_terms_at: agreedTerms ? new Date() : null,
+    });
     return this.userRepo.save(user);
   }
 
@@ -102,6 +111,26 @@ export class UsersService {
 
   async updateName(userId: string, name: string): Promise<void> {
     await this.userRepo.update(userId, { name });
+  }
+
+  async setAgreedTerms(userId: string): Promise<void> {
+    await this.userRepo.update(userId, { agreed_terms_at: new Date() });
+  }
+
+  async setResetToken(userId: string, hashedToken: string, expires: Date): Promise<void> {
+    await this.userRepo.update(userId, { reset_token: hashedToken, reset_token_expires: expires });
+  }
+
+  async findByResetToken(hashedToken: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { reset_token: hashedToken } });
+  }
+
+  async clearResetToken(userId: string): Promise<void> {
+    await this.userRepo.update(userId, { reset_token: null, reset_token_expires: null });
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    await this.userRepo.update(userId, { password: hashedPassword });
   }
 
   async getStats(userId: string): Promise<UserStats> {
@@ -177,5 +206,28 @@ export class UsersService {
     }
 
     return { week_reads, total_reads, tag_distribution, streak_days };
+  }
+
+  async deleteAccount(userId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      // Delete from tables without FK cascade
+      await manager.query('DELETE FROM likes WHERE user_id = $1', [userId]);
+      await manager.query('DELETE FROM reviews WHERE user_id = $1', [userId]);
+      await manager.query('DELETE FROM user_sources WHERE user_id = $1', [userId]);
+      await manager.query('DELETE FROM user_events WHERE user_id = $1', [userId]);
+      // bookmarks, subscriptions, comments — CASCADE handles these
+      await manager.delete(User, userId);
+    });
+
+    // Redis cleanup (best-effort, outside transaction)
+    const keys = [
+      `badge:${userId}`,
+      `notify:token:${userId}`,
+      `notify:batch:${userId}:blog`,
+      `notify:batch:${userId}:youtube`,
+      `notify:batch:${userId}:job`,
+    ];
+    await this.redisProvider.client.del(...keys).catch(() => {});
+    this.logger.log(`Account deleted: ${userId}`);
   }
 }

@@ -9,12 +9,16 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AuthBenefitsSheet } from '../../src/components/AuthBenefitsSheet';
 import { useAuthStore } from '../../src/store/auth.store';
@@ -28,6 +32,7 @@ import {
   getUserStats,
   getUserPreferences,
   updateUserPreferences,
+  deleteAccount,
 } from '../../src/api/users';
 import { COMMON_TAGS, tagsToCategories, expandTagsForSave } from '../../src/constants/tags';
 import { submitReview } from '../../src/api/reviews';
@@ -50,6 +55,8 @@ export default function SettingsScreen() {
   const { theme, setTheme, colors } = useThemeStore();
   const queryClient = useQueryClient();
   const [benefitsVisible, setBenefitsVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile'],
@@ -209,6 +216,47 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '계정 삭제',
+      '정말 계정을 삭제하시겠습니까?\n모든 데이터가 영구적으로 삭제됩니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '계정 삭제',
+          style: 'destructive',
+          onPress: () => {
+            if (profile && (profile as any).has_password) {
+              setDeletePassword('');
+              setDeleteModalVisible(true);
+            } else {
+              (async () => {
+                try {
+                  await deleteAccount();
+                  await logout();
+                  queryClient.clear();
+                } catch {
+                  Alert.alert('오류', '계정 삭제에 실패했습니다.');
+                }
+              })();
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await deleteAccount(deletePassword);
+      setDeleteModalVisible(false);
+      await logout();
+      queryClient.clear();
+    } catch {
+      Alert.alert('오류', '비밀번호가 일치하지 않거나 오류가 발생했습니다.');
+    }
   };
 
   const styles = useMemo(() => StyleSheet.create({
@@ -533,13 +581,20 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </View>
           {nameSaved && <Text style={styles.nameSavedText}>닉네임이 변경되었습니다.</Text>}
-          <View style={{ marginTop: 16 }}>
+          <View style={{ marginTop: 16, gap: 10 }}>
             <TouchableOpacity
               style={styles.dangerButton}
               onPress={handleLogout}
               accessibilityRole="button"
             >
               <Text style={styles.dangerButtonText}>로그아웃</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dangerButton, { borderColor: '#EF4444', backgroundColor: '#FEF2F2' }]}
+              onPress={handleDeleteAccount}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.dangerButtonText, { fontWeight: '600' }]}>계정 삭제</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -758,7 +813,69 @@ export default function SettingsScreen() {
             )}
           </View>
         )}
+
+        {/* 법적 정보 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>법적 정보</Text>
+          <TouchableOpacity
+            style={styles.sourcesNavBtn}
+            onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_API_URL ?? ''}/legal/privacy.html`)}
+            accessibilityRole="link"
+          >
+            <Text style={styles.sourcesNavText}>개인정보처리방침</Text>
+            <Text style={styles.sourcesNavArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sourcesNavBtn, { borderTopWidth: 1, borderTopColor: colors.border }]}
+            onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_API_URL ?? ''}/legal/terms.html`)}
+            accessibilityRole="link"
+          >
+            <Text style={styles.sourcesNavText}>이용약관</Text>
+            <Text style={styles.sourcesNavArrow}>›</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 8, lineHeight: 17 }}>
+            TechFeed는 서비스 개선을 위해 읽기 패턴 및 기기 식별자를 수집합니다. 자세한 내용은 개인정보처리방침을 확인하세요.
+          </Text>
+        </View>
+
+        {/* 앱 정보 */}
+        <Text style={{ textAlign: 'center', fontSize: 12, color: colors.textTertiary, marginBottom: 24 }}>
+          TechFeed v{Constants.expoConfig?.version ?? '1.0.0'}
+        </Text>
       </ScrollView>
+
+      {/* Password confirmation modal for account deletion */}
+      <Modal visible={deleteModalVisible} transparent animationType="fade" onRequestClose={() => setDeleteModalVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setDeleteModalVisible(false)}>
+          <Pressable onPress={() => {}} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24 }}>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 }}>비밀번호 확인</Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 16 }}>계정 삭제를 위해 비밀번호를 입력하세요.</Text>
+            <TextInput
+              style={{ backgroundColor: colors.searchBg, borderRadius: 8, padding: 12, fontSize: 15, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              secureTextEntry
+              placeholder="비밀번호"
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}
+                onPress={() => setDeleteModalVisible(false)}
+              >
+                <Text style={{ color: colors.textPrimary, fontWeight: '500' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center', backgroundColor: '#EF4444' }}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>삭제</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

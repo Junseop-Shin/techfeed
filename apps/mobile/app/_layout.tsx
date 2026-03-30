@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import { AppState, View, ActivityIndicator } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../src/store/auth.store';
 import { useSeenStore } from '../src/store/seen.store';
 import { subscribePush, resetBadge, getBadge } from '../src/api/users';
@@ -62,7 +63,16 @@ function RootLayout() {
 
   useEffect(() => {
     if (!isLoading && pushEnabled) {
-      registerForPushNotifications();
+      // Check if user has seen the pre-permission prompt
+      AsyncStorage.getItem('hasSeenPushPrompt').then((seen) => {
+        if (seen === 'true') {
+          // Already seen prompt — register silently
+          registerForPushNotifications();
+        } else {
+          // Show pre-permission screen after navigation settles
+          setTimeout(() => router.push('/onboarding/push-permission'), 500);
+        }
+      });
     }
   }, [isLoading, pushEnabled]);
 
@@ -116,6 +126,8 @@ function RootLayout() {
       <Stack.Screen name="auth/signup" options={{ presentation: 'modal' }} />
       <Stack.Screen name="content/[id]" options={{ headerShown: true, title: '' }} />
       <Stack.Screen name="settings/sources" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding/push-permission" options={{ presentation: 'modal', headerShown: false }} />
+      <Stack.Screen name="auth/forgot-password" options={{ presentation: 'modal', headerShown: false }} />
     </Stack>
   );
 }

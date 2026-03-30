@@ -15,10 +15,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.techfeed.app",
+      "buildNumber": "1",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.techfeed.app",
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

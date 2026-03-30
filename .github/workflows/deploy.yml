@@ -40,6 +40,7 @@ jobs:
           FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY="${{ secrets.FIREBASE_PRIVATE_KEY }}"
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
           MONITOR_INGESTOR_URL=https://ingestor.nuclearbomb6518.com
           EOF
           ssh -i ~/.ssh/id_deploy \
@@ -76,10 +77,29 @@ jobs:
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             "cd C:/Users/${{ secrets.DEPLOY_USER }}/Projects/techfeed && docker compose up -d --build"
 
-      - name: Run database migrations
+      - name: Wait for database readiness
         run: |
           ssh -i ~/.ssh/id_deploy \
             -p ${{ secrets.DEPLOY_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR UNIQUE NOT NULL, password VARCHAR, name VARCHAR, google_id VARCHAR UNIQUE, fcm_token VARCHAR, created_at TIMESTAMPTZ DEFAULT now());\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR;\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR UNIQUE;\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE users ALTER COLUMN password DROP NOT NULL;\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS subscriptions (id SERIAL PRIMARY KEY, tag VARCHAR NOT NULL, user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, tag));\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, content_id VARCHAR NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, content_id));\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS status VARCHAR;\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS content_type VARCHAR;\" && docker exec techfeed-postgres psql -U techfeed -d techfeed -c \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS job_status VARCHAR;\""
+            "docker exec techfeed-postgres sh -c 'until pg_isready -U techfeed; do sleep 1; done'"
+
+      - name: Run database migrations
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/id_deploy -p ${{ secrets.DEPLOY_PORT }} -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}"
+          PSQL="docker exec techfeed-postgres psql -U techfeed -d techfeed -c"
+          $SSH_CMD "$PSQL \"CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), email VARCHAR UNIQUE NOT NULL, password VARCHAR, name VARCHAR, google_id VARCHAR UNIQUE, fcm_token VARCHAR, created_at TIMESTAMPTZ DEFAULT now());\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR UNIQUE;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ALTER COLUMN password DROP NOT NULL;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS agreed_terms_at TIMESTAMPTZ;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ;\""
+          $SSH_CMD "$PSQL \"UPDATE users SET is_premium = true WHERE email = 'nuclearbomb6518@gmail.com';\""
+          $SSH_CMD "$PSQL \"CREATE TABLE IF NOT EXISTS subscriptions (id SERIAL PRIMARY KEY, tag VARCHAR NOT NULL, user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, tag));\""
+          $SSH_CMD "$PSQL \"CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, content_id VARCHAR NOT NULL, created_at TIMESTAMPTZ DEFAULT now(), user_id UUID REFERENCES users(id) ON DELETE CASCADE, UNIQUE(user_id, content_id));\""
+          $SSH_CMD "$PSQL \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS status VARCHAR;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS content_type VARCHAR;\""
+          $SSH_CMD "$PSQL \"ALTER TABLE bookmarks ADD COLUMN IF NOT EXISTS job_status VARCHAR;\""

@@ -83,3 +83,6 @@ export const resetBadge = (): Promise<void> =>
 
 export const updateName = (name: string): Promise<void> =>
   apiClient.patch('/users/me/name', { name }).then((r) => r.data);
+
+export const deleteAccount = (password?: string): Promise<void> =>
+  apiClient.delete('/users/me', { data: password ? { password } : {} }).then((r) => r.data);
