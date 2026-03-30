@@ -7,8 +7,37 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "📦 Building APK via EAS local build..."
-npx eas build --platform android --profile preview --local --output "$SCRIPT_DIR/build-output.apk"
+# Ensure google-services.json exists (gitignored but needed for build)
+if [ ! -f "$SCRIPT_DIR/google-services.json" ]; then
+  SECRETS_PATH="$HOME/Documents/Work/Projects/secrets/google-services.json"
+  if [ -f "$SECRETS_PATH" ]; then
+    cp "$SECRETS_PATH" "$SCRIPT_DIR/google-services.json"
+    echo "📋 Copied google-services.json from secrets"
+  else
+    echo "❌ google-services.json not found"
+    exit 1
+  fi
+fi
+
+echo "📦 Building APK..."
+
+# prebuild
+npx expo prebuild --platform android --clean
+
+# Patch foojay-resolver-convention version (Gradle compatibility)
+SETTINGS_FILE="$SCRIPT_DIR/android/settings.gradle"
+if [ -f "$SETTINGS_FILE" ]; then
+  sed -i '' 's/org.gradle.toolchains.foojay-resolver-convention:0.8.0/org.gradle.toolchains.foojay-resolver-convention:0.9.0/g' "$SETTINGS_FILE"
+fi
+
+# Build release APK
+cd "$SCRIPT_DIR/android"
+./gradlew assembleRelease
+
+# Copy output
+APK_SRC=$(find "$SCRIPT_DIR/android/app/build/outputs/apk/release" -name "*.apk" | head -1)
+cp "$APK_SRC" "$SCRIPT_DIR/build-output.apk"
+cd "$SCRIPT_DIR"
 
 APK_PATH="$SCRIPT_DIR/build-output.apk"
 if [ ! -f "$APK_PATH" ]; then

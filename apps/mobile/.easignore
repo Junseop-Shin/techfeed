@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
