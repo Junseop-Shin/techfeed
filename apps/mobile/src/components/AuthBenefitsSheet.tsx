@@ -240,25 +240,24 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
             </Text>
           </View>
 
-          <View style={{ flex: 1 }}>
-            <ScrollView
-              showsVerticalScrollIndicator={true}
-              contentContainerStyle={styles.scrollContent}
-              bounces={true}
-              nestedScrollEnabled
-              overScrollMode="always"
-            >
-              {BENEFITS.map((benefit) => (
-                <View key={benefit.title} style={styles.benefitItem}>
-                  <Text style={styles.benefitIcon}>{benefit.icon}</Text>
-                  <View style={styles.benefitText}>
-                    <Text style={styles.benefitTitle}>{benefit.title}</Text>
-                    <Text style={styles.benefitDescription}>{benefit.description}</Text>
-                  </View>
+          <ScrollView
+            style={{ maxHeight: SCREEN_HEIGHT * 0.45 }}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.scrollContent}
+            bounces={true}
+            nestedScrollEnabled
+            overScrollMode="always"
+          >
+            {BENEFITS.map((benefit) => (
+              <View key={benefit.title} style={styles.benefitItem}>
+                <Text style={styles.benefitIcon}>{benefit.icon}</Text>
+                <View style={styles.benefitText}>
+                  <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                  <Text style={styles.benefitDescription}>{benefit.description}</Text>
                 </View>
-              ))}
-            </ScrollView>
-          </View>
+              </View>
+            ))}
+          </ScrollView>
 
           <View style={styles.divider} />
 
