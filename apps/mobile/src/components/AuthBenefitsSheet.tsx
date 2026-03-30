@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useRef, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -7,7 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Platform,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/theme.store';
@@ -62,9 +64,55 @@ const BENEFITS: Benefit[] = [
   },
 ];
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DISMISS_THRESHOLD = 120;
+
 export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSheetProps) {
   const colors = useThemeStore((s) => s.colors);
   const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        gesture.dy > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          translateY.setValue(gesture.dy);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > DISMISS_THRESHOLD || gesture.vy > 0.5) {
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+            translateY.setValue(0);
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 8,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
+  const handleClose = () => {
+    Animated.timing(translateY, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose();
+      translateY.setValue(0);
+    });
+  };
 
   const styles = useMemo(
     () =>
@@ -79,23 +127,24 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           paddingBottom: Math.max(insets.bottom, 16) + 20,
-          maxHeight: '85%',
+          maxHeight: '90%',
+        },
+        handleArea: {
+          alignItems: 'center' as const,
+          paddingVertical: 12,
         },
         handle: {
           width: 36,
           height: 4,
           backgroundColor: colors.border,
           borderRadius: 2,
-          alignSelf: 'center',
-          marginTop: 12,
-          marginBottom: 4,
         },
         scrollContent: {
           paddingHorizontal: 24,
           paddingBottom: 8,
         },
         titleRow: {
-          paddingTop: 20,
+          paddingTop: 8,
           paddingBottom: 20,
         },
         title: {
@@ -163,7 +212,7 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
           fontWeight: '500' as const,
         },
       }),
-    [colors]
+    [colors, insets.bottom],
   );
 
   return (
@@ -171,16 +220,24 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent
     >
-      <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="시트 닫기">
-        <Pressable onPress={() => {}} style={styles.sheet}>
-          <View style={styles.handle} />
+      <Pressable style={styles.overlay} onPress={handleClose} accessibilityLabel="시트 닫기">
+        <Animated.View
+          style={[styles.sheet, { transform: [{ translateY }] }]}
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Handle area: swipe down to dismiss */}
+          <View {...panResponder.panHandlers} style={styles.handleArea}>
+            <View style={styles.handle} />
+          </View>
+
           <ScrollView
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
             contentContainerStyle={styles.scrollContent}
             bounces={false}
+            nestedScrollEnabled
           >
             <View style={styles.titleRow}>
               <Text style={styles.title}>
@@ -212,27 +269,15 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.laterButton}
-              onPress={onClose}
+              onPress={handleClose}
               accessibilityRole="button"
               accessibilityLabel="나중에"
             >
               <Text style={styles.laterButtonText}>나중에</Text>
             </TouchableOpacity>
           </View>
-        </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
 }
-
-/*
-Usage example:
-<AuthBenefitsSheet
-  visible={sheetVisible}
-  onClose={() => setSheetVisible(false)}
-  onSignIn={() => {
-    setSheetVisible(false);
-    router.push('/auth/login');
-  }}
-/>
-*/
