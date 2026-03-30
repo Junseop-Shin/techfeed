@@ -79,11 +79,15 @@ jobs:
 
       - name: Wait for database readiness
         run: |
-          ssh -i ~/.ssh/id_deploy \
-            -p ${{ secrets.DEPLOY_PORT }} \
-            -o StrictHostKeyChecking=no \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "docker exec techfeed-postgres sh -c 'until pg_isready -U techfeed; do sleep 1; done'"
+          for i in $(seq 1 15); do
+            result=$(ssh -i ~/.ssh/id_deploy \
+              -p ${{ secrets.DEPLOY_PORT }} \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "docker exec techfeed-postgres pg_isready -U techfeed" 2>&1) && echo "$result" && break
+            echo "Waiting for postgres... ($i/15)"
+            sleep 3
+          done
 
       - name: Run database migrations
         run: |
