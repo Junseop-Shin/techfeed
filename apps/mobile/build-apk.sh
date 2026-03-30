@@ -19,9 +19,9 @@ if [ ! -f "$SCRIPT_DIR/google-services.json" ]; then
   fi
 fi
 
-echo "📦 Building APK..."
+echo "📦 Building APK via EAS local build..."
 
-# prebuild
+# prebuild to generate android/ with google-services.json included
 npx expo prebuild --platform android --clean
 
 # Patch foojay-resolver-convention version (Gradle compatibility)
@@ -30,14 +30,11 @@ if [ -f "$SETTINGS_FILE" ]; then
   sed -i '' 's/org.gradle.toolchains.foojay-resolver-convention:0.8.0/org.gradle.toolchains.foojay-resolver-convention:0.9.0/g' "$SETTINGS_FILE"
 fi
 
-# Build release APK
-cd "$SCRIPT_DIR/android"
-./gradlew assembleRelease
-
-# Copy output
-APK_SRC=$(find "$SCRIPT_DIR/android/app/build/outputs/apk/release" -name "*.apk" | head -1)
-cp "$APK_SRC" "$SCRIPT_DIR/build-output.apk"
-cd "$SCRIPT_DIR"
+# EAS local build with EAS keystore (required for Google OAuth SHA-1 match)
+# Uses --skip-prebuild since we already ran prebuild above
+npx eas build --platform android --profile preview --local \
+  --output "$SCRIPT_DIR/build-output.apk" \
+  --non-interactive
 
 APK_PATH="$SCRIPT_DIR/build-output.apk"
 if [ ! -f "$APK_PATH" ]; then

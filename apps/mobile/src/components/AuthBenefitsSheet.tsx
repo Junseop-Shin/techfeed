@@ -7,7 +7,9 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '../store/theme.store';
 
 interface AuthBenefitsSheetProps {
@@ -62,6 +64,7 @@ const BENEFITS: Benefit[] = [
 
 export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSheetProps) {
   const colors = useThemeStore((s) => s.colors);
+  const insets = useSafeAreaInsets();
 
   const styles = useMemo(
     () =>
@@ -75,7 +78,7 @@ export function AuthBenefitsSheet({ visible, onClose, onSignIn }: AuthBenefitsSh
           backgroundColor: colors.surface,
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          paddingBottom: 32,
+          paddingBottom: Math.max(insets.bottom, 16) + 20,
           maxHeight: '85%',
         },
         handle: {
