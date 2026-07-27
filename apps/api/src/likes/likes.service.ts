@@ -63,4 +63,14 @@ export class LikesService {
       .getRawMany<{ content_id: string; count: string }>();
     return Object.fromEntries(rows.map((r) => [r.content_id, parseInt(r.count, 10)]));
   }
+
+  async getAllLikeCounts(): Promise<Map<string, number>> {
+    const rows = await this.likeRepo
+      .createQueryBuilder('like')
+      .select('like.content_id', 'content_id')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('like.content_id')
+      .getRawMany<{ content_id: string; count: string }>();
+    return new Map(rows.map((r) => [r.content_id, parseInt(r.count, 10)]));
+  }
 }

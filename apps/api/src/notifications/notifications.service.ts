@@ -18,11 +18,13 @@ interface UserBatch {
   token: string;
 }
 
+const BATCH_KEY_PREFIX = 'notif:batch:';
+const BATCH_TTL_SECONDS = 48 * 60 * 60; // 48h
+
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationsService.name);
   private subscriber: Redis;
-  private readonly batches = new Map<string, UserBatch>();
 
   constructor(
     private readonly redisProvider: RedisProvider,
@@ -51,8 +53,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    this.batches.clear();
     this.subscriber.disconnect();
+  }
+
+  private batchKey(userId: string): string {
+    return `${BATCH_KEY_PREFIX}${userId}`;
   }
 
   // Redis key for per-user badge count
@@ -100,36 +105,48 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`handleNewContent: queuing for ${recipientMap.size} recipients, source_type=${source_type ?? 'unknown'}`);
 
-    for (const [userId, token] of recipientMap) {
-      this.addToBatch(userId, token, source_type ?? 'blog');
-    }
+    await Promise.all(
+      [...recipientMap.entries()].map(([userId, token]) =>
+        this.addToBatch(userId, token, source_type ?? 'blog'),
+      ),
+    );
   }
 
-  private addToBatch(userId: string, token: string, source_type: 'blog' | 'youtube' | 'job'): void {
-    const existing = this.batches.get(userId);
-
-    if (existing) {
-      existing[source_type]++;
-      existing.token = token; // update in case token changed
-    } else {
-      this.batches.set(userId, {
-        blog: source_type === 'blog' ? 1 : 0,
-        youtube: source_type === 'youtube' ? 1 : 0,
-        job: source_type === 'job' ? 1 : 0,
-        token,
-      });
-    }
+  private async addToBatch(userId: string, token: string, source_type: 'blog' | 'youtube' | 'job'): Promise<void> {
+    const key = this.batchKey(userId);
+    await this.redisProvider.client
+      .pipeline()
+      .hincrby(key, source_type, 1)
+      .hset(key, 'token', token)
+      .expire(key, BATCH_TTL_SECONDS)
+      .exec();
   }
 
   // 스케줄러에서 하루 4회 호출 (08:30, 12:00, 18:00, 21:00)
   async flushAllBatches(): Promise<void> {
-    if (this.batches.size === 0) return;
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, found] = await this.redisProvider.client.scan(
+        cursor,
+        'MATCH',
+        `${BATCH_KEY_PREFIX}*`,
+        'COUNT',
+        '100',
+      );
+      cursor = next;
+      keys.push(...found);
+    } while (cursor !== '0');
 
-    this.logger.log(`Flushing ${this.batches.size} pending notification batches`);
-    const entries = [...this.batches.entries()];
-    this.batches.clear();
+    if (keys.length === 0) return;
 
-    await Promise.allSettled(entries.map(([userId, batch]) => this.flushBatch(userId, batch)));
+    this.logger.log(`Flushing ${keys.length} pending notification batches`);
+    await Promise.allSettled(
+      keys.map((key) => {
+        const userId = key.slice(BATCH_KEY_PREFIX.length);
+        return this.flushBatch(userId, key);
+      }),
+    );
   }
 
   private buildBatchMessage(batch: UserBatch): string {
@@ -142,15 +159,27 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     return `${parts.join(', ')}가 있습니다. 확인해보세요!`;
   }
 
-  private async flushBatch(userId: string, batch: UserBatch): Promise<void> {
-    this.batches.delete(userId);
+  private async flushBatch(userId: string, redisKey: string): Promise<void> {
+    const data = await this.redisProvider.client.hgetall(redisKey);
+    if (!data || !data.token) return;
+
+    const batch: UserBatch = {
+      blog: parseInt(data.blog ?? '0', 10),
+      youtube: parseInt(data.youtube ?? '0', 10),
+      job: parseInt(data.job ?? '0', 10),
+      token: data.token,
+    };
 
     const body = this.buildBatchMessage(batch);
-    if (!body) return;
+    if (!body) {
+      await this.redisProvider.client.del(redisKey);
+      return;
+    }
 
     try {
       const badge = await this.incrementBadge(userId);
       await this.pushService.send(batch.token, '새 콘텐츠 도착', body, undefined, badge);
+      await this.redisProvider.client.del(redisKey);
       this.logger.log(`Batch push sent to user ${userId}: ${body}`);
     } catch (err) {
       this.logger.warn(`Batch push failed for user ${userId}: ${err}`);
