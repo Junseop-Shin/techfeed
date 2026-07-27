@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Subscription } from '../subscriptions/subscription.entity';
 import { RedisProvider } from '../cache/redis.provider';
@@ -41,6 +41,11 @@ export class UsersService {
       where: { id },
       relations: ['subscriptions'],
     });
+  }
+
+  async findByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+    return this.userRepo.findBy({ id: In(ids) });
   }
 
   async create(email: string, hashedPassword: string, name?: string, agreedTerms?: boolean): Promise<User> {

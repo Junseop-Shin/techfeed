@@ -1,15 +1,11 @@
-import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
+import { Controller, NotFoundException, Post, Request, UseGuards } from '@nestjs/common';
+import { Body } from '@nestjs/common';
 import { IsString } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from '../users/users.service';
 import { PushService } from './push.service';
 
 class SubscribeDto {
-  @IsString()
-  fcm_token: string;
-}
-
-class TestPushDto {
   @IsString()
   fcm_token: string;
 }
@@ -33,9 +29,13 @@ export class PushController {
 
   @Post('test')
   @UseGuards(JwtAuthGuard)
-  async test(@Body() dto: TestPushDto) {
+  async test(@Request() req: { user: { userId: string } }) {
+    const user = await this.usersService.findById(req.user.userId);
+    if (!user?.fcm_token) {
+      throw new NotFoundException('No FCM token registered for this user');
+    }
     await this.pushService.send(
-      dto.fcm_token,
+      user.fcm_token,
       'TechFeed 테스트',
       '푸시 알림이 정상적으로 동작합니다.',
     );

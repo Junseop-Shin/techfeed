@@ -47,9 +47,11 @@ export class ContentsService implements OnModuleInit {
 
   private async reindexAll(): Promise<void> {
     this.logger.log('Re-indexing all contents into Elasticsearch...');
-    const contents = await this.contentModel.find().lean().exec();
-    let count = 0;
-    for (const c of contents) {
+    const cursor = this.contentModel.find().lean().cursor();
+    let indexed = 0;
+    let total = 0;
+    for await (const c of cursor) {
+      total++;
       try {
         await this.searchService.indexContent(String(c._id), {
           title: c.title,
@@ -63,12 +65,12 @@ export class ContentsService implements OnModuleInit {
           view_count: c.view_count ?? 0,
           has_ai_summary: !!c.ai_summary,
         });
-        count++;
+        indexed++;
       } catch (err) {
         this.logger.warn(`Failed to index content ${c._id}: ${err}`);
       }
     }
-    this.logger.log(`Re-indexed ${count}/${contents.length} contents`);
+    this.logger.log(`Re-indexed ${indexed}/${total} contents`);
   }
 
   async search(opts: SearchContentsOptions & { sort?: string }) {
@@ -87,6 +89,7 @@ export class ContentsService implements OnModuleInit {
       );
       const countMap = new Map(rows.map((r) => [r.content_id, parseInt(r.count, 10)]));
       result.items.sort((a: any, b: any) => (countMap.get(b.id) ?? 0) - (countMap.get(a.id) ?? 0));
+      await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
       return result;
     }
 
@@ -98,6 +101,7 @@ export class ContentsService implements OnModuleInit {
         .exec();
       const viewMap = new Map(docs.map((d) => [String(d._id), d.view_count ?? 0]));
       result.items.sort((a: any, b: any) => (viewMap.get(b.id) ?? 0) - (viewMap.get(a.id) ?? 0));
+      await this.cacheService.setFeedCache(cacheKey, JSON.stringify(result));
       return result;
     }
 
@@ -105,7 +109,7 @@ export class ContentsService implements OnModuleInit {
     return result;
   }
 
-  @Cron('0 2 * * *')
+  @Cron('0 2 * * *', { timeZone: 'Asia/Seoul' })
   async cleanupOldContent(): Promise<void> {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const oldContents = await this.contentModel

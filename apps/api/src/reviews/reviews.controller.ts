@@ -18,6 +18,7 @@ export class ReviewsController {
     return this.reviewsService.create(req.user.userId, dto.rating, dto.body);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
     return this.reviewsService.findAll();

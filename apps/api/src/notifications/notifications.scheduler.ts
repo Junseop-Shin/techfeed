@@ -27,28 +27,18 @@ export class NotificationsScheduler {
   ) {}
 
   // 새 콘텐츠 푸시 — 하루 4회: 08:30, 12:00, 18:00, 21:00
-  @Cron('30 8 * * *')
-  async sendNewContentBatch0830(): Promise<void> {
+  @Cron('30 8 * * *', { timeZone: 'Asia/Seoul' })
+  async sendNewContentBatchMorning(): Promise<void> {
     await this.notificationsService.flushAllBatches();
   }
 
-  @Cron('0 12 * * *')
-  async sendNewContentBatch1200(): Promise<void> {
-    await this.notificationsService.flushAllBatches();
-  }
-
-  @Cron('0 18 * * *')
-  async sendNewContentBatch1800(): Promise<void> {
-    await this.notificationsService.flushAllBatches();
-  }
-
-  @Cron('0 21 * * *')
-  async sendNewContentBatch2100(): Promise<void> {
+  @Cron('0 12,18,21 * * *', { timeZone: 'Asia/Seoul' })
+  async sendNewContentBatches(): Promise<void> {
     await this.notificationsService.flushAllBatches();
   }
 
   // Every Monday at 09:00
-  @Cron('0 9 * * 1')
+  @Cron('0 9 * * 1', { timeZone: 'Asia/Seoul' })
   async sendWeeklyTrends(): Promise<void> {
     this.logger.log('Running weekly trend push notification');
 
@@ -83,7 +73,7 @@ export class NotificationsScheduler {
   }
 
   // Every day at 09:00
-  @Cron('0 9 * * *')
+  @Cron('0 9 * * *', { timeZone: 'Asia/Seoul' })
   async sendJobDeadlineAlerts(): Promise<void> {
     this.logger.log('Running job deadline alert push notification');
 
@@ -130,6 +120,8 @@ export class NotificationsScheduler {
         bookmarksByContentId.set(b.content_id, existing);
       }
 
+      // Collect all unique userIds that need alerts, then batch-fetch once
+      const alertItems: { content: (typeof contents)[number]; diffDays: number; userIds: string[] }[] = [];
       for (const content of contents) {
         const deadline = new Date(content.deadline as Date);
         deadline.setHours(0, 0, 0, 0);
@@ -143,13 +135,24 @@ export class NotificationsScheduler {
         const userIds = bookmarksByContentId.get(contentIdStr) ?? [];
         if (userIds.length === 0) continue;
 
+        alertItems.push({ content, diffDays, userIds });
+      }
+
+      if (alertItems.length === 0) return;
+
+      const uniqueUserIds = [...new Set(alertItems.flatMap((a) => a.userIds))];
+      const users = await this.usersService.findByIds(uniqueUserIds);
+      const userMap = new Map(users.map((u) => [u.id, u]));
+
+      for (const { content, diffDays, userIds } of alertItems) {
+        const contentIdStr = String(content._id);
         const companyName = (content.company_name as string | undefined) ?? '채용공고';
         const position = (content.position as string | undefined) ?? content.title;
         const pushTitle = `[${companyName}] 지원 마감 D-${diffDays}`;
         const pushBody = `${position} 마감 D-${diffDays}일 남았습니다`;
 
         for (const userId of userIds) {
-          const user = await this.usersService.findById(userId);
+          const user = userMap.get(userId);
           if (!user?.fcm_token) continue;
 
           await this.pushService.send(user.fcm_token, pushTitle, pushBody, {

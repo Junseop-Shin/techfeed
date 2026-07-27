@@ -18,3 +18,6 @@ GoogleService-Info.plist
 *.key
 *.pem
 *.mobileprovision
+
+# Build artifacts
+*.apk

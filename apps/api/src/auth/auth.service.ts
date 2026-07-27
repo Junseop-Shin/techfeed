@@ -74,7 +74,8 @@ export class AuthService {
 
   async googleLogin(accessToken: string): Promise<{ access_token: string; user: { id: string; email: string; name: string } }> {
     const res = await fetch(
-      `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`,
+      'https://www.googleapis.com/oauth2/v2/userinfo',
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
     if (!res.ok) {

@@ -58,11 +58,11 @@ export class CacheService {
   }
 
   async incrementRateLimit(key: string, ttlSeconds: number): Promise<number> {
-    const count = await this.redis.client.incr(key);
-    if (count === 1) {
-      await this.redis.client.expire(key, ttlSeconds);
-    }
-    return count;
+    const script = `local c = redis.call('INCR', KEYS[1])
+if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return c`;
+    const result = await this.redis.client.eval(script, 1, key, String(ttlSeconds));
+    return result as number;
   }
 
   async invalidateFeedCache(sourceType?: string): Promise<void> {
